@@ -1,0 +1,56 @@
+---
+alwaysApply: false
+---
+
+## HubSpot Feature Requirements
+
+### 1. HubSpot OAuth Integration
+
+- Add a new section in Settings that allows the user to connect their HubSpot account.
+- Implement OAuth using HubSpot's self-service developer portal.
+- Store and manage OAuth tokens securely (access + refresh tokens).
+- Handle token refresh automatically.
+
+### 2. Trigger HubSpot Update Flow After a Meeting is Recorded
+
+- After a meeting transcript is available, allow the user to open a modal to review HubSpot contact updates.
+- The modal should be launched from the past meeting detail view.
+
+### 3. Search & Select HubSpot Contact
+
+- Add a search/select component inside the modal that queries HubSpot contacts.
+- Use the HubSpot Contacts API to fetch matching contacts.
+- After selecting a contact, fetch the full HubSpot contact record.
+
+### 4. AI-Generated Suggested Updates
+
+- Use the transcript + HubSpot contact data as input to AI.
+- AI outputs a structured list of suggested field updates. Example:
+  - Detected updated phone number from transcript.
+  - Suggest: `phone` field should change from existing value to the new value.
+- For each field:
+  - Show current HubSpot value.
+  - Show AI-suggested new value.
+
+### 5. Matching UI Design Precisely
+
+- The modal UI must match the provided design **exactly**.
+- The UI should include:
+  - A list of fields with current value vs suggested value.
+  - Approve/update buttons.
+  - A final "Update HubSpot" button.
+
+### 6. Syncing Approved Updates Back to HubSpot
+
+- When the user clicks "Update HubSpot":
+  - Send a PATCH request to HubSpot's Contacts API.
+  - Only update fields the user approved.
+  - Show success/failure states.
+
+### 7. Testing Requirements
+
+- Add strong automated tests covering:
+  - OAuth integration
+  - Contact lookup
+  - HubSpot update sync
+  - AI update generation pipeline
