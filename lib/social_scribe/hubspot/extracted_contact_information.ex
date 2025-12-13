@@ -16,6 +16,6 @@ defmodule SocialScribe.Hubspot.ExtractedContactInformation do
   def changeset(extracted_contact_information, attrs) do
     extracted_contact_information
     |> cast(attrs, [:contact_info, :meeting_transcript_id])
-    |> validate_required([:contact_info, :meeting_transcript_id])
+    |> validate_required([:meeting_transcript_id])
   end
 end

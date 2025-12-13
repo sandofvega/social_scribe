@@ -3,7 +3,7 @@ defmodule SocialScribe.Repo.Migrations.CreateExtractedContactInformation do
 
   def change do
     create table(:extracted_contact_information) do
-      add :contact_info, :map, null: false
+      add :contact_info, :map, null: true
 
       add :meeting_transcript_id,
           references(:meeting_transcripts, on_delete: :delete_all),

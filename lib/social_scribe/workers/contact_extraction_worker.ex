@@ -12,8 +12,9 @@ defmodule SocialScribe.Workers.ContactExtractionWorker do
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"meeting_transcript_id" => transcript_id}}) do
     with {:ok, %Meeting{} = meeting} <- load_meeting_from_transcript(transcript_id),
-         {:ok, transcript_text} <- build_non_host_transcript_text(meeting),
-         {:ok, contact_info} <- extract_contact_info(transcript_text),
+         {:ok, transcript_text} <- build_transcript_text(meeting),
+         host_names <- host_participant_names(meeting),
+         {:ok, contact_info} <- extract_contact_info(transcript_text, host_names),
          {:ok, _record} <- persist_contact_info(meeting.meeting_transcript.id, contact_info) do
       :ok
     else
@@ -44,33 +45,26 @@ defmodule SocialScribe.Workers.ContactExtractionWorker do
     Ecto.NoResultsError -> {:error, :transcript_not_found}
   end
 
-  defp build_non_host_transcript_text(%Meeting{} = meeting) do
-    with %MeetingTranscript{} = transcript <- meeting.meeting_transcript,
-         non_host_names when non_host_names != [] <- non_host_participant_names(meeting) do
-      transcript
-      |> filter_segments(non_host_names)
-      |> case do
-        [] ->
-          {:skip, :no_matching_segments}
+  defp build_transcript_text(%Meeting{} = meeting) do
+    case meeting.meeting_transcript do
+      %MeetingTranscript{} = transcript ->
+        transcript
+        |> all_segments()
+        |> segments_to_text()
+        |> case do
+          "" -> {:skip, :empty_transcript}
+          transcript_text -> {:ok, transcript_text}
+        end
 
-        segments ->
-          segments
-          |> segments_to_text()
-          |> case do
-            "" -> {:skip, :empty_transcript}
-            transcript_text -> {:ok, transcript_text}
-          end
-      end
-    else
-      nil -> {:skip, :missing_transcript}
-      [] -> {:skip, :no_non_host_participants}
+      nil ->
+        {:skip, :missing_transcript}
     end
   end
 
-  defp extract_contact_info(transcript_text) do
-    case AIContentGeneratorApi.extract_contact_information(transcript_text) do
+  defp extract_contact_info(transcript_text, host_names) do
+    case AIContentGeneratorApi.extract_contact_information(transcript_text, host_names) do
       {:ok, %{} = contact_info} when map_size(contact_info) == 0 ->
-        {:skip, :no_contact_fields}
+        {:ok, nil}
 
       {:ok, contact_info} ->
         {:ok, contact_info}
@@ -93,24 +87,16 @@ defmodule SocialScribe.Workers.ContactExtractionWorker do
     end
   end
 
-  defp non_host_participant_names(%Meeting{} = meeting) do
+  defp host_participant_names(%Meeting{} = meeting) do
     meeting.meeting_participants
-    |> Enum.reject(& &1.is_host)
+    |> Enum.filter(& &1.is_host)
     |> Enum.map(&normalize_string(&1.name))
     |> Enum.reject(&is_nil/1)
   end
 
-  defp filter_segments(%MeetingTranscript{} = transcript, non_host_names) do
+  defp all_segments(%MeetingTranscript{} = transcript) do
     transcript.content
     |> Map.get("data", [])
-    |> Enum.filter(fn segment ->
-      speaker =
-        segment
-        |> Map.get("speaker")
-        |> normalize_string()
-
-      speaker && speaker in non_host_names
-    end)
   end
 
   defp segments_to_text(segments) do

@@ -64,7 +64,18 @@ defmodule SocialScribe.AIContentGenerator do
   end
 
   @impl SocialScribe.AIContentGeneratorApi
-  def extract_contact_information(transcript_text) when is_binary(transcript_text) do
+  def extract_contact_information(transcript_text, host_names \\ [])
+      when is_binary(transcript_text) and is_list(host_names) do
+    duplicate_resolution =
+      if Enum.empty?(host_names) do
+        ""
+      else
+        host_list = Enum.join(host_names, ", ")
+        """
+        DUPLICATE RESOLUTION: If the same contact field (e.g., email, phone) is mentioned by both the host(s) (#{host_list}) and a participant with different values, prefer the value mentioned by the participant.
+        """
+      end
+
     prompt = """
     Extract all contact information mentioned in the following meeting transcript.
     Return a JSON object with only the fields that are actually found.
@@ -75,7 +86,14 @@ defmodule SocialScribe.AIContentGenerator do
     - job_title, company_name
     - date_of_birth, marital_status, time_zone
 
-    Return ONLY valid JSON, no additional text.
+    #{duplicate_resolution}
+
+    IMPORTANT INSTRUCTIONS:
+    - Only extract information that is EXPLICITLY mentioned in the transcript
+    - Do NOT generate placeholder, example, or dummy data (e.g., "example.com", "John Doe", "555-123-4567")
+    - Do NOT make up or infer contact information
+    - If no contact information is found in the transcript, return an empty JSON object: {}
+    - Return ONLY valid JSON, no additional text
 
     Transcript:
     #{transcript_text}
@@ -87,7 +105,7 @@ defmodule SocialScribe.AIContentGenerator do
     end
   end
 
-  def extract_contact_information(_transcript_text),
+  def extract_contact_information(_transcript_text, _host_names),
     do: {:error, :invalid_transcript_payload}
 
   defp call_gemini(prompt_text) do
@@ -216,6 +234,9 @@ defmodule SocialScribe.AIContentGenerator do
                 is_binary(value) && String.trim(value) == "" ->
                   acc
 
+                is_binary(value) && is_placeholder_value?(value) ->
+                  acc
+
                 true ->
                   Map.put(acc, key, value)
               end
@@ -232,6 +253,40 @@ defmodule SocialScribe.AIContentGenerator do
   end
 
   defp decode_contact_info(_), do: {:error, :invalid_response}
+
+  defp is_placeholder_value?(value) when is_binary(value) do
+    normalized = String.downcase(String.trim(value))
+
+    # Check for common placeholder patterns
+    cond do
+      # Example emails
+      String.contains?(normalized, "@example.com") or
+          String.contains?(normalized, "@example.org") or
+          String.contains?(normalized, "@test.com") ->
+        true
+
+      # Common placeholder phone numbers (555-xxxx pattern)
+      Regex.match?(~r/^555[-.\s]?\d{3}[-.\s]?\d{4}$/, normalized) ->
+        true
+
+      # Common placeholder names
+      normalized in ["john doe", "jane doe", "jane smith", "john smith", "alice smith", "bob smith"] ->
+        true
+
+      # Common placeholder companies
+      normalized in ["acme corp", "acme corporation", "example company", "test company", "sample company"] ->
+        true
+
+      # Generic placeholder values
+      normalized in ["example", "test", "sample", "placeholder", "dummy", "n/a", "na"] ->
+        true
+
+      true ->
+        false
+    end
+  end
+
+  defp is_placeholder_value?(_), do: false
 
   defp clean_json_text(text) do
     text
