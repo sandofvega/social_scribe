@@ -1,0 +1,68 @@
+---
+description: This document describes the current functional workflow of the provided. It is intended to help an AI code editor understand how the existing system behaves so it can generate or modify code accurately.
+alwaysApply: false
+---
+
+# Existing Feature Workflow
+
+## 1. Google Authentication Flow
+
+- User opens the app and chooses **Sign in with Google**.
+- The app uses Google OAuth (client ID and secret stored in environment variables) to authenticate the user.
+- After successful login, the app stores the authentication session and retrieves access tokens needed for Google Calendar API.
+
+---
+
+## 2. Multi‑Account Google Calendar Integration
+
+- A user can connect **multiple Google accounts**.
+- For each connected account, the app fetches **upcoming calendar events**.
+- Events are aggregated into a unified list in the UI.
+
+---
+
+## 3. Event Display and Notetaker Toggle
+
+- Upcoming events appear in the dashboard.
+- Each event includes details such as name, time.
+- A toggle switch appears beside each event.
+  - When toggled **on**, the app is instructed to send a Recall.ai notetaker to that meeting.
+
+---
+
+## 4. Recall.ai Integration (Notetaker Bot)
+
+- The app uses an API key stored in the environment file.
+
+- When toggled ON for an event:
+
+  1. The app searches the event  for a **Zoom / Meet**.
+  2. It schedules a Recall.ai bot to join the meeting a configurable number of minutes before the start.
+
+- The lead time ("join X minutes before start") is configurable in user settings.
+
+---
+
+## 5. Post‑Meeting Workflow
+
+- After a meeting ends, Recall.ai provides:
+
+  - The full **transcript**.
+  - Metadata about the call.
+
+- The app receives or fetches this data.
+
+- The meeting appears in the **Past Meetings** list.
+
+---
+
+## 6. Viewing a Past Meeting
+
+When the user clicks on a past meeting:
+
+- The full transcript is displayed.
+- The app generates an AI‑based **draft follow‑up email** summarizing the conversation.
+
+---
+
+This workflow represents the foundation upon which the new HubSpot features will be added. It sets the stage for extending the system to interact with CRM data after each meeting.

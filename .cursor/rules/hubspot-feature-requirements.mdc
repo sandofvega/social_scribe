@@ -1,27 +1,28 @@
 ---
+description: This document explains the HubSpot integration within the meeting workflow. How the app connects to HubSpot, turns transcripts into CRM update suggestions, and lets users approve changes through a simple review modal.
 alwaysApply: false
 ---
 
-## HubSpot Feature Requirements
+# HubSpot Feature Requirements
 
-### 1. HubSpot OAuth Integration
+## 1. HubSpot OAuth Integration
 
 - Add a new section in Settings that allows the user to connect their HubSpot account.
 - Implement OAuth using HubSpot.
 - Store and manage OAuth tokens securely.
 
-### 2. Trigger HubSpot Update Flow After a Meeting is Recorded
+## 2. Trigger HubSpot Update Flow After a Meeting is Recorded
 
 - After a meeting transcript is available, allow the user to open a modal to review HubSpot contact updates.
 - The modal should be launched from the past meeting detail view.
 
-### 3. Search & Select HubSpot Contact
+## 3. Search & Select HubSpot Contact
 
 - Add a search/select component inside the modal that queries HubSpot contacts.
 - Use the HubSpot Contacts API to fetch matching contacts.
 - After selecting a contact, fetch the full HubSpot contact record.
 
-### 4. AI-Generated Suggested Updates
+## 4. AI-Generated Suggested Updates
 
 - Use the transcript + HubSpot contact data as input to AI.
 - AI outputs a structured list of suggested field updates. Example:
@@ -31,7 +32,7 @@ alwaysApply: false
   - Show current HubSpot value.
   - Show AI-suggested new value.
 
-### 5. Matching UI Design Precisely
+## 5. Matching UI Design Precisely
 
 - The modal UI must match the provided design **exactly**.
 - The UI should include:
@@ -39,14 +40,14 @@ alwaysApply: false
   - Approve/update buttons.
   - A final "Update HubSpot" button.
 
-### 6. Syncing Approved Updates Back to HubSpot
+## 6. Syncing Approved Updates Back to HubSpot
 
 - When the user clicks "Update HubSpot":
   - Send a PATCH request to HubSpot's Contacts API.
   - Only update fields the user approved.
   - Show success/failure states.
 
-### 7. Testing Requirements
+## 7. Testing Requirements
 
 - Add strong automated tests covering:
   - OAuth integration
