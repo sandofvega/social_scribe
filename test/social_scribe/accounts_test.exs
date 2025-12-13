@@ -471,6 +471,193 @@ defmodule SocialScribe.AccountsTest do
       assert updated_credential.token == "new-token"
       assert updated_credential.refresh_token == "new-refresh"
     end
+
+    test "creates a new credential for HubSpot when none exists" do
+      user = user_fixture()
+
+      auth = %Ueberauth.Auth{
+        provider: :hubspot,
+        uid: "12345",
+        info: %Ueberauth.Auth.Info{
+          email: user.email
+        },
+        credentials: %Ueberauth.Auth.Credentials{
+          token: "test-access-token",
+          refresh_token: "test-refresh-token",
+          expires_at: DateTime.add(DateTime.utc_now(), 21600, :second),
+          token_type: "Bearer",
+          expires: true,
+          scopes: ["crm.objects.contacts.read", "oauth"]
+        }
+      }
+
+      {:ok, credential} = Accounts.find_or_create_user_credential(user, auth)
+
+      assert credential.provider == "hubspot"
+      assert credential.uid == "12345"
+      assert credential.token == "test-access-token"
+      assert credential.refresh_token == "test-refresh-token"
+      assert credential.user_id == user.id
+      assert credential.email == user.email
+      assert credential.expires_at != nil
+    end
+
+    test "updates existing credential for HubSpot" do
+      user = user_fixture()
+
+      existing_credential =
+        user_credential_fixture(%{
+          user_id: user.id,
+          provider: "hubspot",
+          uid: "12345",
+          token: "old-token",
+          refresh_token: "old-refresh-token"
+        })
+
+      auth = %Ueberauth.Auth{
+        provider: :hubspot,
+        uid: "12345",
+        info: %Ueberauth.Auth.Info{
+          email: user.email
+        },
+        credentials: %Ueberauth.Auth.Credentials{
+          token: "new-access-token",
+          refresh_token: "new-refresh-token",
+          expires_at: DateTime.add(DateTime.utc_now(), 21600, :second),
+          token_type: "Bearer",
+          expires: true,
+          scopes: ["crm.objects.contacts.read", "oauth"]
+        }
+      }
+
+      {:ok, updated_credential} = Accounts.find_or_create_user_credential(user, auth)
+
+      assert updated_credential.id == existing_credential.id
+      assert updated_credential.token == "new-access-token"
+      assert updated_credential.refresh_token == "new-refresh-token"
+    end
+
+    test "handles HubSpot credential with DateTime expires_at" do
+      user = user_fixture()
+
+      expires_at = DateTime.add(DateTime.utc_now(), 21600, :second) |> DateTime.truncate(:second)
+
+      auth = %Ueberauth.Auth{
+        provider: :hubspot,
+        uid: "12345",
+        info: %Ueberauth.Auth.Info{
+          email: user.email
+        },
+        credentials: %Ueberauth.Auth.Credentials{
+          token: "test-token",
+          refresh_token: "test-refresh",
+          expires_at: expires_at,
+          token_type: "Bearer",
+          expires: true,
+          scopes: ["oauth"]
+        }
+      }
+
+      {:ok, credential} = Accounts.find_or_create_user_credential(user, auth)
+
+      # Compare by truncating to seconds to avoid microsecond precision issues
+      assert DateTime.truncate(credential.expires_at, :second) == expires_at
+    end
+
+    test "handles HubSpot credential with integer expires_at (Unix timestamp)" do
+      user = user_fixture()
+
+      expires_at_unix = DateTime.utc_now() |> DateTime.add(21600, :second) |> DateTime.to_unix()
+
+      auth = %Ueberauth.Auth{
+        provider: :hubspot,
+        uid: "12345",
+        info: %Ueberauth.Auth.Info{
+          email: user.email
+        },
+        credentials: %Ueberauth.Auth.Credentials{
+          token: "test-token",
+          refresh_token: "test-refresh",
+          expires_at: expires_at_unix,
+          token_type: "Bearer",
+          expires: true,
+          scopes: ["oauth"]
+        }
+      }
+
+      {:ok, credential} = Accounts.find_or_create_user_credential(user, auth)
+
+      # Should convert Unix timestamp to DateTime
+      assert credential.expires_at != nil
+      assert %DateTime{} = credential.expires_at
+    end
+
+    test "handles HubSpot credential without expires_at (uses default 6 hours)" do
+      user = user_fixture()
+
+      auth = %Ueberauth.Auth{
+        provider: :hubspot,
+        uid: "12345",
+        info: %Ueberauth.Auth.Info{
+          email: user.email
+        },
+        credentials: %Ueberauth.Auth.Credentials{
+          token: "test-token",
+          refresh_token: "test-refresh",
+          expires_at: nil,
+          token_type: "Bearer",
+          expires: false,
+          scopes: ["oauth"]
+        }
+      }
+
+      {:ok, credential} = Accounts.find_or_create_user_credential(user, auth)
+
+      # Should set default expiration (6 hours)
+      assert credential.expires_at != nil
+      expected_expires = DateTime.add(DateTime.utc_now(), 21600, :second) |> DateTime.truncate(:second)
+      # Allow 5 second difference for test execution time
+      actual_expires = DateTime.truncate(credential.expires_at, :second)
+      assert DateTime.diff(actual_expires, expected_expires, :second) < 5
+    end
+
+    test "get_user_hubspot_credential/1 returns HubSpot credential for user" do
+      user = user_fixture()
+
+      hubspot_credential =
+        user_credential_fixture(%{
+          user_id: user.id,
+          provider: "hubspot",
+          uid: "12345"
+        })
+
+      # Create another credential for a different provider
+      _google_credential =
+        user_credential_fixture(%{
+          user_id: user.id,
+          provider: "google",
+          uid: "google-123"
+        })
+
+      found_credential = Accounts.get_user_hubspot_credential(user)
+
+      assert found_credential.id == hubspot_credential.id
+      assert found_credential.provider == "hubspot"
+    end
+
+    test "get_user_hubspot_credential/1 returns nil when no HubSpot credential exists" do
+      user = user_fixture()
+
+      # Create a credential for a different provider
+      _google_credential =
+        user_credential_fixture(%{
+          user_id: user.id,
+          provider: "google",
+          uid: "google-123"
+        })
+
+      assert Accounts.get_user_hubspot_credential(user) == nil
+    end
   end
 
   describe "facebook_page_credentials" do
