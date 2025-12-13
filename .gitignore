@@ -39,3 +39,6 @@ npm-debug.log
 
 # ENV
 .env
+
+# Cursor debug log
+.cursor/debug.log

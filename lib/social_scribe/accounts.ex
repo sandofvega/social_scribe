@@ -149,6 +149,13 @@ defmodule SocialScribe.Accounts do
   end
 
   @doc """
+  Gets a user's HubSpot credential.
+  """
+  def get_user_hubspot_credential(user) do
+    Repo.get_by(UserCredential, user_id: user.id, provider: "hubspot")
+  end
+
+  @doc """
   Gets a user credential by user, provider, and uid.
 
   ## Examples
@@ -328,6 +335,32 @@ defmodule SocialScribe.Accounts do
       expires_at:
         (auth.credentials.expires_at && DateTime.from_unix!(auth.credentials.expires_at)) ||
           DateTime.add(DateTime.utc_now(), 3600, :second),
+      email: auth.info.email
+    }
+  end
+
+  defp format_credential_attrs(user, %Auth{provider: :hubspot} = auth) do
+    # HubSpot uses hub_id (portal ID) as the unique identifier
+    # The uid from auth is the hub_id
+    expires_at =
+      if auth.credentials.expires_at do
+        if is_integer(auth.credentials.expires_at) do
+          DateTime.from_unix!(auth.credentials.expires_at)
+        else
+          auth.credentials.expires_at
+        end
+      else
+        # HubSpot tokens typically expire in 6 hours, but we'll set a default
+        DateTime.add(DateTime.utc_now(), 21600, :second)
+      end
+
+    %{
+      user_id: user.id,
+      provider: to_string(auth.provider),
+      uid: auth.uid,
+      token: auth.credentials.token,
+      refresh_token: auth.credentials.refresh_token,
+      expires_at: expires_at,
       email: auth.info.email
     }
   end

@@ -10,6 +10,8 @@ defmodule SocialScribeWeb.UserSettingsLive do
 
     google_accounts = Accounts.list_user_credentials(current_user, provider: "google")
 
+    hubspot_accounts = Accounts.list_user_credentials(current_user, provider: "hubspot")
+
     linkedin_accounts = Accounts.list_user_credentials(current_user, provider: "linkedin")
 
     facebook_accounts = Accounts.list_user_credentials(current_user, provider: "facebook")
@@ -23,6 +25,7 @@ defmodule SocialScribeWeb.UserSettingsLive do
       socket
       |> assign(:page_title, "User Settings")
       |> assign(:google_accounts, google_accounts)
+      |> assign(:hubspot_accounts, hubspot_accounts)
       |> assign(:linkedin_accounts, linkedin_accounts)
       |> assign(:facebook_accounts, facebook_accounts)
       |> assign(:user_bot_preference, user_bot_preference)

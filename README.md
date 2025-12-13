@@ -130,6 +130,9 @@ Follow these steps to get SocialScribe running on your local machine.
         * `FACEBOOK_APP_ID`: Your Facebook App ID.
         * `FACEBOOK_APP_SECRET`: Your Facebook App Secret.
         * `FACEBOOK_REDIRECT_URI`: `"http://localhost:4000/auth/facebook/callback"`
+        * `HUBSPOT_CLIENT_ID`: Your HubSpot app client ID.
+        * `HUBSPOT_CLIENT_SECRET`: Your HubSpot app client secret.
+        * `HUBSPOT_REDIRECT_URI`: `"http://localhost:4000/auth/hubspot/callback"`
 
 4.  **Start the Phoenix Server:**
     ```bash

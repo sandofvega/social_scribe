@@ -10,10 +10,11 @@ config :bcrypt_elixir, :log_rounds, 1
 # to provide built-in test partitioning in CI environment.
 # Run `mix help test` for more information.
 config :social_scribe, SocialScribe.Repo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
-  database: "social_scribe_test#{System.get_env("MIX_TEST_PARTITION")}",
+  username: System.get_env("DB_USER", "postgres"),
+  password: System.get_env("DB_PASSWORD", "postgres"),
+  hostname: System.get_env("DB_HOST", "localhost"),
+  port: System.get_env("DB_PORT", "5432") |> String.to_integer(),
+  database: System.get_env("DB_NAME", "social_scribe_test"),
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: System.schedulers_online() * 2
 
