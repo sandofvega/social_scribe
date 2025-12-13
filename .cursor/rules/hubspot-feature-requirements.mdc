@@ -7,9 +7,8 @@ alwaysApply: false
 ### 1. HubSpot OAuth Integration
 
 - Add a new section in Settings that allows the user to connect their HubSpot account.
-- Implement OAuth using HubSpot's self-service developer portal.
-- Store and manage OAuth tokens securely (access + refresh tokens).
-- Handle token refresh automatically.
+- Implement OAuth using HubSpot.
+- Store and manage OAuth tokens securely.
 
 ### 2. Trigger HubSpot Update Flow After a Meeting is Recorded
 
