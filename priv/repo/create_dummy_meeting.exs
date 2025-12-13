@@ -5,7 +5,7 @@ alias SocialScribe.Repo
 alias SocialScribe.Accounts.{User, UserCredential}
 alias SocialScribe.Calendar.{CalendarEvent}
 alias SocialScribe.Bots.{RecallBot}
-alias SocialScribe.Meetings.{Meeting, MeetingTranscript}
+alias SocialScribe.Meetings.{Meeting, MeetingTranscript, MeetingParticipant}
 
 import Ecto.Query
 
@@ -274,6 +274,37 @@ create_meeting_transcript = fn meeting ->
   end
 end
 
+# Create meeting participants
+create_meeting_participants = fn meeting ->
+  # Based on the transcript, we have two participants:
+  # - Sarah Johnson (advisor, speaker_id: 100) - host
+  # - Michael Chen (client, speaker_id: 200) - not host
+
+  participants = [
+    %{
+      recall_participant_id: "100",
+      name: "Sarah Johnson",
+      is_host: true,
+      meeting_id: meeting.id
+    },
+    %{
+      recall_participant_id: "200",
+      name: "Michael Chen",
+      is_host: false,
+      meeting_id: meeting.id
+    }
+  ]
+
+  Enum.each(participants, fn attrs ->
+    case SocialScribe.Meetings.create_meeting_participant(attrs) do
+      {:ok, participant} ->
+        IO.puts("    ✓ Created participant: #{participant.name} (#{if participant.is_host, do: "host", else: "participant"})")
+      {:error, changeset} ->
+        raise "Failed to create meeting participant: #{inspect(changeset.errors)}"
+    end
+  end)
+end
+
 # Main function - creates everything in a transaction
 create_dummy_meeting = fn ->
   Repo.transaction(fn ->
@@ -308,6 +339,10 @@ create_dummy_meeting = fn ->
     IO.puts("  → Creating meeting transcript...")
     transcript = create_meeting_transcript.(meeting)
     IO.puts("    ✓ Created transcript with #{length(transcript.content.data)} segments")
+
+    # Create meeting participants
+    IO.puts("  → Creating meeting participants...")
+    create_meeting_participants.(meeting)
 
     IO.puts("\n✅ Successfully created dummy meeting!")
     IO.puts("   Meeting ID: #{meeting.id}")
