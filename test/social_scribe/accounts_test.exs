@@ -615,7 +615,10 @@ defmodule SocialScribe.AccountsTest do
 
       # Should set default expiration (6 hours)
       assert credential.expires_at != nil
-      expected_expires = DateTime.add(DateTime.utc_now(), 21600, :second) |> DateTime.truncate(:second)
+
+      expected_expires =
+        DateTime.add(DateTime.utc_now(), 21600, :second) |> DateTime.truncate(:second)
+
       # Allow 5 second difference for test execution time
       actual_expires = DateTime.truncate(credential.expires_at, :second)
       assert DateTime.diff(actual_expires, expected_expires, :second) < 5

@@ -144,7 +144,8 @@ defmodule SocialScribeWeb.AuthControllerTest do
 
       # The actual redirect happens in the Ueberauth plug
       # We can verify the route exists
-      assert conn.status in [302, 200] # 302 for redirect, 200 if handled differently
+      # 302 for redirect, 200 if handled differently
+      assert conn.status in [302, 200]
     end
   end
 end

@@ -10,6 +10,7 @@ defmodule SocialScribe.Meetings do
   alias SocialScribe.Meetings.MeetingTranscript
   alias SocialScribe.Meetings.MeetingParticipant
   alias SocialScribe.Bots.RecallBot
+  alias SocialScribe.Workers.ContactExtractionWorker
 
   require Logger
 
@@ -191,9 +192,19 @@ defmodule SocialScribe.Meetings do
 
   """
   def create_meeting_transcript(attrs \\ %{}) do
-    %MeetingTranscript{}
-    |> MeetingTranscript.changeset(attrs)
-    |> Repo.insert()
+    result =
+      %MeetingTranscript{}
+      |> MeetingTranscript.changeset(attrs)
+      |> Repo.insert()
+
+    case result do
+      {:ok, transcript} ->
+        enqueue_contact_extraction_job(transcript)
+        {:ok, transcript}
+
+      _ ->
+        result
+    end
   end
 
   @doc """
@@ -241,6 +252,23 @@ defmodule SocialScribe.Meetings do
   """
   def change_meeting_transcript(%MeetingTranscript{} = meeting_transcript, attrs \\ %{}) do
     MeetingTranscript.changeset(meeting_transcript, attrs)
+  end
+
+  defp enqueue_contact_extraction_job(%MeetingTranscript{id: transcript_id}) do
+    %{"meeting_transcript_id" => transcript_id}
+    |> ContactExtractionWorker.new()
+    |> Oban.insert()
+    |> case do
+      {:ok, _job} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.error(
+          "Failed to enqueue ContactExtractionWorker for transcript #{transcript_id}: #{inspect(reason)}"
+        )
+
+        :error
+    end
   end
 
   alias SocialScribe.Meetings.MeetingParticipant

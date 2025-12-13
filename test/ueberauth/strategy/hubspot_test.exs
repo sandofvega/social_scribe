@@ -42,11 +42,11 @@ defmodule Ueberauth.Strategy.HubspotTest do
       conn =
         :get
         |> conn("/auth/hubspot/callback?code=test_code")
-        |> put_private(:ueberauth_strategy_options, [
+        |> put_private(:ueberauth_strategy_options,
           client_id: "test_client_id",
           client_secret: "test_client_secret",
           redirect_uri: "http://localhost:4000/auth/hubspot/callback"
-        ])
+        )
         |> put_private(:hubspot_token, token)
         |> put_private(:hubspot_user, %{
           "hub_id" => "12345",
@@ -79,11 +79,11 @@ defmodule Ueberauth.Strategy.HubspotTest do
       conn =
         :get
         |> conn("/auth/hubspot/callback?code=invalid_code")
-        |> put_private(:ueberauth_strategy_options, [
+        |> put_private(:ueberauth_strategy_options,
           client_id: "test_client_id",
           client_secret: "test_client_secret",
           redirect_uri: "http://localhost:4000/auth/hubspot/callback"
-        ])
+        )
 
       # The actual error handling happens in handle_callback! when token is nil
       # We simulate this by testing the error path
@@ -181,6 +181,7 @@ defmodule Ueberauth.Strategy.HubspotTest do
 
     test "calculates expires_at from expires_in when not present" do
       expires_in = 3600
+
       token = %AccessToken{
         access_token: "test_access_token",
         expires_at: nil,
@@ -259,11 +260,11 @@ defmodule Ueberauth.Strategy.HubspotTest do
 
     test "OAuth.client/1 uses Application config when opts not provided" do
       # Set application config
-      Application.put_env(:ueberauth, Hubspot.OAuth, [
+      Application.put_env(:ueberauth, Hubspot.OAuth,
         client_id: "app_client_id",
         client_secret: "app_client_secret",
         redirect_uri: "http://app.example.com/callback"
-      ])
+      )
 
       client = Hubspot.OAuth.client()
 
@@ -276,10 +277,10 @@ defmodule Ueberauth.Strategy.HubspotTest do
     end
 
     test "OAuth.client/1 prefers opts over Application config" do
-      Application.put_env(:ueberauth, Hubspot.OAuth, [
+      Application.put_env(:ueberauth, Hubspot.OAuth,
         client_id: "app_client_id",
         client_secret: "app_client_secret"
-      ])
+      )
 
       client =
         Hubspot.OAuth.client(
