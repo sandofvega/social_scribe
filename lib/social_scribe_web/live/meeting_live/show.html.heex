@@ -40,6 +40,10 @@
           <p class="text-slate-500">
             No contact information found in the meeting.
           </p>
+        <% is_nil(@hubspot_credential) -> %>
+          <p class="text-slate-500">
+            Connect your HubSpot account to review and sync contact updates from this meeting.
+          </p>
         <% true -> %>
           <.link
             patch={~p"/dashboard/meetings/#{@meeting}/review_update"}
@@ -363,11 +367,7 @@
                 nil
             end %>
           <% button_disabled = @hubspot_update_loading or not is_nil(disabled_reason) %>
-          <% button_title =
-            cond do
-              @hubspot_update_loading -> "Updating HubSpot..."
-              true -> disabled_reason
-            end %>
+          <% button_title = if @hubspot_update_loading, do: nil, else: disabled_reason %>
           <button
             type="button"
             phx-click="update-hubspot"
@@ -391,15 +391,6 @@
             <% end %>
           </button>
         </div>
-        <p :if={@hubspot_update_error} class="text-sm text-red-600">
-          {@hubspot_update_error}
-        </p>
-        <p
-          :if={@hubspot_update_success && is_nil(@hubspot_update_error)}
-          class="text-sm text-green-600"
-        >
-          HubSpot updated successfully.
-        </p>
       </div>
     </div>
   </div>

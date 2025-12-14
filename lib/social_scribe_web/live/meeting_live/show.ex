@@ -302,19 +302,19 @@ defmodule SocialScribeWeb.MeetingLive.Show do
       is_nil(socket.assigns.hubspot_credential) ->
         {:noreply,
          socket
-         |> assign(:hubspot_update_error, "Connect your HubSpot account to sync updates.")
+         |> put_flash(:error, "Connect your HubSpot account to sync updates.")
          |> assign(:hubspot_update_success, false)}
 
       is_nil(socket.assigns.selected_contact) ->
         {:noreply,
          socket
-         |> assign(:hubspot_update_error, "Select a HubSpot contact before updating.")
+         |> put_flash(:error, "Select a HubSpot contact before updating.")
          |> assign(:hubspot_update_success, false)}
 
       socket.assigns.selected_field_count == 0 ->
         {:noreply,
          socket
-         |> assign(:hubspot_update_error, "Select at least one field to update.")
+         |> put_flash(:error, "Select at least one field to update.")
          |> assign(:hubspot_update_success, false)}
 
       true ->
@@ -327,10 +327,7 @@ defmodule SocialScribeWeb.MeetingLive.Show do
         if map_size(updates) == 0 do
           {:noreply,
            socket
-           |> assign(
-             :hubspot_update_error,
-             "No extracted values available for the selected fields."
-           )
+           |> put_flash(:error, "No extracted values available for the selected fields.")
            |> assign(:hubspot_update_success, false)}
         else
           credential = socket.assigns.hubspot_credential
@@ -342,9 +339,9 @@ defmodule SocialScribeWeb.MeetingLive.Show do
               {:noreply,
                socket
                |> assign(:hubspot_update_loading, false)
-               |> assign(:hubspot_update_error, nil)
                |> assign(:hubspot_update_success, true)
-               |> put_flash(:info, "HubSpot contact updated successfully.")}
+               |> put_flash(:info, "HubSpot contact updated successfully.")
+               |> push_patch(to: ~p"/dashboard/meetings/#{socket.assigns.meeting}")}
 
             {:error, reason} ->
               Logger.error("HubSpot contact update failed: #{inspect(reason)}")
@@ -352,10 +349,7 @@ defmodule SocialScribeWeb.MeetingLive.Show do
               {:noreply,
                socket
                |> assign(:hubspot_update_loading, false)
-               |> assign(
-                 :hubspot_update_error,
-                 "Unable to update HubSpot right now. Please try again."
-               )
+               |> put_flash(:error, "Unable to update HubSpot right now. Please try again.")
                |> assign(:hubspot_update_success, false)}
           end
         end
