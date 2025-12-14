@@ -59,7 +59,7 @@ defmodule SocialScribeWeb.MeetingLive.ShowTest do
         contact_info: %{"first_name" => "John"}
       })
 
-      {:ok, view, _html} = live(conn, ~p"/dashboard/meetings/#{meeting.id}/review_update")
+      {:ok, view, _html} = live(conn, ~p"/dashboard/meetings/#{meeting.id}/review_hubspot_update")
 
       # Clear search with empty query
       assert view
@@ -82,7 +82,7 @@ defmodule SocialScribeWeb.MeetingLive.ShowTest do
         }
       })
 
-      {:ok, view, _html} = live(conn, ~p"/dashboard/meetings/#{meeting.id}/review_update")
+      {:ok, view, _html} = live(conn, ~p"/dashboard/meetings/#{meeting.id}/review_hubspot_update")
 
       # Should show the modal with contact information
       html = render(view)
@@ -98,7 +98,7 @@ defmodule SocialScribeWeb.MeetingLive.ShowTest do
         contact_info: %{"first_name" => "Jane"}
       })
 
-      {:ok, view, _html} = live(conn, ~p"/dashboard/meetings/#{meeting.id}/review_update")
+      {:ok, view, _html} = live(conn, ~p"/dashboard/meetings/#{meeting.id}/review_hubspot_update")
 
       # Update button should be disabled
       html = render(view)

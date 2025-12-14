@@ -46,7 +46,7 @@
           </p>
         <% true -> %>
           <.link
-            patch={~p"/dashboard/meetings/#{@meeting}/review_update"}
+            patch={~p"/dashboard/meetings/#{@meeting}/review_hubspot_update"}
             class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
           >
             Review Update
@@ -163,7 +163,7 @@
 </.modal>
 
 <.modal
-  :if={@live_action == :review_update}
+  :if={@live_action == :review_hubspot_update}
   id="review-update-modal"
   show
   on_cancel={JS.patch(~p"/dashboard/meetings/#{@meeting}")}
@@ -264,13 +264,38 @@
         </p>
       </div>
 
+      <% filtered_categories =
+        if @selected_contact do
+          filter_categories_with_differences(@organized_categories, @selected_contact, @contact_info_map)
+        else
+          @organized_categories
+        end %>
+      <% filtered_categories_ordered = ordered_categories(filtered_categories) |> Enum.take(@max_categories) %>
+
+      <div
+        :if={Enum.empty?(filtered_categories_ordered) && @selected_contact}
+        class="p-5 bg-[#f7f7f7] rounded-[10px]"
+      >
+        <div class="flex items-center gap-3">
+          <.icon name="hero-check-circle" class="w-5 h-5 text-green-600" />
+          <p class="text-sm text-slate-600">
+            All contact information is up to date. No updates needed.
+          </p>
+        </div>
+      </div>
+
       <div
         :for={
-          {category, fields} <-
-            ordered_categories(@organized_categories) |> Enum.take(@max_categories)
+          {category, fields} <- filtered_categories_ordered
         }
         class="p-5 bg-[#f7f7f7] rounded-[10px]"
       >
+        <% filtered_fields =
+          if @selected_contact do
+            filter_fields_with_differences(fields, @selected_contact, @contact_info_map)
+          else
+            fields
+          end %>
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-3">
             <input
@@ -287,7 +312,7 @@
               class="px-2.5 py-1 text-xs font-medium rounded-full text-gray-700"
               style="background-color: rgba(222, 222, 222, 1);"
             >
-              {updates_selected_label(fields, @selected_fields)}
+              {updates_selected_label(filtered_fields, @selected_fields)}
             </span>
             <span class="text-sm cursor-default" style="color: rgba(99, 99, 99, 1);">
               Hide details
@@ -295,7 +320,7 @@
           </div>
         </div>
         <div class="space-y-4">
-          <div :for={field <- fields}>
+          <div :for={field <- filtered_fields}>
             <div class="flex items-center gap-3 mb-2 ml-8">
               <label class="text-sm text-slate-600 font-bold">{humanize_field(field)}</label>
             </div>

@@ -131,14 +131,14 @@ defmodule SocialScribeWeb.MeetingLive.Show do
   def handle_params(_params, _uri, socket) do
     socket =
       case socket.assigns[:live_action] do
-        :review_update ->
+        :review_hubspot_update ->
           # When opening the modal, select all fields
           organized_categories = socket.assigns.organized_categories
           all_fields_selected = build_initial_selected_fields(organized_categories)
           assign_selection(socket, all_fields_selected)
 
         _ ->
-          # When closing the modal (or not in review_update), reset the selected contact
+          # When closing the modal (or not in review_hubspot_update), reset the selected contact
           socket
           |> assign(:selected_contact, nil)
           |> assign(:contact_search_query, "")
@@ -615,6 +615,48 @@ defmodule SocialScribeWeb.MeetingLive.Show do
   end
 
   defp normalize_extracted_value(value), do: value
+
+  defp normalize_hubspot_value(nil), do: nil
+  defp normalize_hubspot_value(""), do: nil
+
+  defp normalize_hubspot_value(value) when is_binary(value) do
+    value
+    |> String.trim()
+    |> case do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp normalize_hubspot_value(value), do: value
+
+  defp values_are_different?(selected_contact, field, contact_info_map) do
+    existing_raw = if selected_contact, do: get_hubspot_field_value(selected_contact, field), else: nil
+    extracted_raw = get_extracted_field_value(contact_info_map, field)
+
+    existing_normalized = normalize_hubspot_value(existing_raw)
+    extracted_normalized = normalize_extracted_value(extracted_raw)
+
+    existing_normalized != extracted_normalized
+  end
+
+  defp filter_fields_with_differences(fields, selected_contact, contact_info_map) do
+    Enum.filter(fields, fn field ->
+      values_are_different?(selected_contact, field, contact_info_map)
+    end)
+  end
+
+  defp filter_categories_with_differences(categories, selected_contact, contact_info_map) do
+    Enum.reduce(categories, %{}, fn {category, fields}, acc ->
+      filtered_fields = filter_fields_with_differences(fields, selected_contact, contact_info_map)
+
+      if Enum.empty?(filtered_fields) do
+        acc
+      else
+        Map.put(acc, category, filtered_fields)
+      end
+    end)
+  end
 
   defp format_field_value(nil), do: "No existing value"
   defp format_field_value(""), do: "No existing value"
