@@ -299,17 +299,35 @@
                 phx-click="toggle-field"
                 phx-value-field={field}
               />
+              <% raw_value = if @selected_contact do
+                get_hubspot_field_value(@selected_contact, field)
+              else
+                nil
+              end %>
+              <% has_real_value = raw_value != nil && raw_value != "" %>
+              <% existing_value = if has_real_value do
+                format_field_value(raw_value)
+              else
+                nil
+              end %>
+              <% placeholder_text = cond do
+                is_nil(@selected_contact) -> "Select a contact"
+                !has_real_value -> "No existing value"
+                true -> nil
+              end %>
+              <% is_field_selected = Map.get(@selected_fields, field, false) %>
+              <% has_existing_value = @selected_contact && has_real_value %>
+              <% should_strikethrough = is_field_selected && has_existing_value %>
               <input
                 type="text"
-                value={
-                  if @selected_contact do
-                    format_field_value(get_hubspot_field_value(@selected_contact, field))
-                  else
-                    "Select a contact"
-                  end
-                }
+                value={existing_value}
+                placeholder={placeholder_text}
                 readonly
-                class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-white text-sm text-slate-700"
+                class={[
+                  "flex-1 px-3 py-2 border border-gray-300 rounded-md bg-white text-sm",
+                  if(should_strikethrough, do: "line-through", else: "text-slate-700")
+                ]}
+                style={if(should_strikethrough, do: "color: rgba(107, 107, 107, 1);", else: "")}
               />
               <svg
                 class="w-5 h-5 text-gray-400"
