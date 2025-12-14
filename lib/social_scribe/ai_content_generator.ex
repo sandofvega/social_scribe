@@ -71,6 +71,7 @@ defmodule SocialScribe.AIContentGenerator do
         ""
       else
         host_list = Enum.join(host_names, ", ")
+
         """
         DUPLICATE RESOLUTION: If the same contact field (e.g., email, phone) is mentioned by both the host(s) (#{host_list}) and a participant with different values, prefer the value mentioned by the participant.
         """
@@ -261,7 +262,7 @@ defmodule SocialScribe.AIContentGenerator do
     cond do
       # Example emails
       String.contains?(normalized, "@example.com") or
-          String.contains?(normalized, "@example.org") or
+        String.contains?(normalized, "@example.org") or
           String.contains?(normalized, "@test.com") ->
         true
 
@@ -270,11 +271,24 @@ defmodule SocialScribe.AIContentGenerator do
         true
 
       # Common placeholder names
-      normalized in ["john doe", "jane doe", "jane smith", "john smith", "alice smith", "bob smith"] ->
+      normalized in [
+        "john doe",
+        "jane doe",
+        "jane smith",
+        "john smith",
+        "alice smith",
+        "bob smith"
+      ] ->
         true
 
       # Common placeholder companies
-      normalized in ["acme corp", "acme corporation", "example company", "test company", "sample company"] ->
+      normalized in [
+        "acme corp",
+        "acme corporation",
+        "example company",
+        "test company",
+        "sample company"
+      ] ->
         true
 
       # Generic placeholder values

@@ -183,7 +183,10 @@
           phx-submit="search-contacts"
           class="flex items-center justify-start border border-gray-300 rounded-md px-3 pt-0 pb-0 bg-white gap-3"
         >
-          <div class="w-[30px] h-[30px] rounded-full flex items-center justify-center text-white text-xs font-semibold" style="background-color: rgba(186, 186, 186, 1);">
+          <div
+            class="w-[30px] h-[30px] rounded-full flex items-center justify-center text-white text-xs font-semibold"
+            style="background-color: rgba(186, 186, 186, 1);"
+          >
             {contact_initials(@selected_contact)}
           </div>
           <input
@@ -280,10 +283,15 @@
             <h3 class="text-lg font-semibold text-slate-700">{humanize_category(category)}</h3>
           </div>
           <div class="flex items-center gap-2">
-            <span class="px-2.5 py-1 text-xs font-medium rounded-full text-gray-700" style="background-color: rgba(222, 222, 222, 1);">
+            <span
+              class="px-2.5 py-1 text-xs font-medium rounded-full text-gray-700"
+              style="background-color: rgba(222, 222, 222, 1);"
+            >
               {updates_selected_label(fields, @selected_fields)}
             </span>
-            <span class="text-sm cursor-default" style="color: rgba(99, 99, 99, 1);">Hide details</span>
+            <span class="text-sm cursor-default" style="color: rgba(99, 99, 99, 1);">
+              Hide details
+            </span>
           </div>
         </div>
         <div class="space-y-4">
@@ -299,22 +307,25 @@
                 phx-click="toggle-field"
                 phx-value-field={field}
               />
-              <% raw_value = if @selected_contact do
-                get_hubspot_field_value(@selected_contact, field)
-              else
-                nil
-              end %>
+              <% raw_value =
+                if @selected_contact do
+                  get_hubspot_field_value(@selected_contact, field)
+                else
+                  nil
+                end %>
               <% has_real_value = raw_value != nil && raw_value != "" %>
-              <% existing_value = if has_real_value do
-                format_field_value(raw_value)
-              else
-                nil
-              end %>
-              <% placeholder_text = cond do
-                is_nil(@selected_contact) -> nil
-                !has_real_value -> "No existing value"
-                true -> nil
-              end %>
+              <% existing_value =
+                if has_real_value do
+                  format_field_value(raw_value)
+                else
+                  nil
+                end %>
+              <% placeholder_text =
+                cond do
+                  is_nil(@selected_contact) -> nil
+                  !has_real_value -> "No existing value"
+                  true -> nil
+                end %>
               <% is_field_selected = Map.get(@selected_fields, field, false) %>
               <% has_existing_value = @selected_contact && has_real_value %>
               <% should_strikethrough = is_field_selected && has_existing_value %>
@@ -330,12 +341,26 @@
                 style={if(should_strikethrough, do: "color: rgba(107, 107, 107, 1);", else: "")}
               />
               <svg
-                class="w-5 h-5 text-gray-400"
-                fill="currentColor"
-                viewBox="0 0 24 24"
+                width="30"
+                height="24"
+                viewBox="0 0 60 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                class="text-[rgba(92,92,92,1)]"
               >
                 <path
-                  d="M8 5v14l9-7-9-7z"
+                  d="M1 12H55"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M48 5L55 12L48 19"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
                 />
               </svg>
               <input
