@@ -1,6 +1,7 @@
 defmodule Ueberauth.Strategy.HubspotTest do
   use ExUnit.Case, async: true
-  use Plug.Test
+  import Plug.Test
+  import Plug.Conn
 
   import Mox
   alias Ueberauth.Strategy.Hubspot
@@ -26,14 +27,6 @@ defmodule Ueberauth.Strategy.HubspotTest do
           "hub_id" => 12345,
           "scopes" => "crm.objects.contacts.read oauth"
         }
-      }
-
-      # Mock OAuth2 client get_token response
-      client = %OAuth2.Client{
-        client_id: "test_client_id",
-        client_secret: "test_client_secret",
-        redirect_uri: "http://localhost:4000/auth/hubspot/callback",
-        site: "https://api.hubapi.com"
       }
 
       # We need to mock the Tesla call for fetching user email

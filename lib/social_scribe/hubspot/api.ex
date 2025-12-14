@@ -8,6 +8,7 @@ defmodule SocialScribe.Hubspot.Api do
   alias SocialScribe.Accounts
   alias SocialScribe.Accounts.UserCredential
   alias SocialScribe.HubspotTokenRefresher
+  alias SocialScribe.Repo
 
   @base_url "https://api.hubapi.com"
   @search_path "/crm/v3/objects/contacts/search"
@@ -27,7 +28,6 @@ defmodule SocialScribe.Hubspot.Api do
     maritalstatus
     timezone
   )
-  @searchable_fields ~w(firstname lastname email phone company)
   @default_limit 5
 
   @type credential :: %UserCredential{}
@@ -57,7 +57,13 @@ defmodule SocialScribe.Hubspot.Api do
                  @search_path,
                  search_body
                ) do
-          decode_search_response(response)
+          handle_search_response(response, credential, fn fresh_credential ->
+            Tesla.post(
+              client(fresh_credential.token),
+              @search_path,
+              search_body
+            )
+          end)
         else
           {:error, reason} ->
             {:error, reason}
@@ -79,13 +85,7 @@ defmodule SocialScribe.Hubspot.Api do
              "#{@contacts_path}/#{contact_id}",
              query: [properties: Enum.join(@default_properties, ",")]
            ) do
-      case response do
-        %Tesla.Env{status: 200, body: %{"id" => _id}} ->
-          {:ok, response.body}
-
-        %Tesla.Env{status: status, body: body} ->
-          {:error, {:hubspot_error, status, body}}
-      end
+      handle_get_contact_response(response, credential, contact_id)
     else
       {:error, reason} ->
         {:error, reason}
@@ -105,7 +105,7 @@ defmodule SocialScribe.Hubspot.Api do
              "#{@contacts_path}/#{contact_id}",
              %{properties: properties}
            ) do
-      decode_update_response(response)
+      handle_update_response(response, credential, contact_id, properties)
     else
       {:error, reason} ->
         {:error, reason}
@@ -137,6 +137,215 @@ defmodule SocialScribe.Hubspot.Api do
     {:error, {:hubspot_error, status, body}}
   end
 
+  # Handle search API responses, automatically refreshing token on 401 errors
+  defp handle_search_response(
+         %Tesla.Env{status: 200, body: %{"results" => _results}} = response,
+         _credential,
+         _retry_fn
+       ) do
+    decode_search_response(response)
+  end
+
+  defp handle_search_response(
+         %Tesla.Env{status: 401} = response,
+         credential,
+         retry_fn
+       ) do
+    Logger.warning(
+      "HubSpot API returned 401 for user_id: #{credential.user_id}. Attempting token refresh."
+    )
+
+    # Try to refresh the token and retry the request
+    case refresh_token(credential) do
+      {:ok, _fresh_token} ->
+        # Reload the credential to get the updated token
+        case Repo.get(UserCredential, credential.id) do
+          nil ->
+            Logger.error("Could not reload credential after refresh")
+            decode_search_response(response)
+
+          fresh_credential ->
+            case retry_fn.(fresh_credential) do
+              {:ok, retry_response} ->
+                handle_search_response(retry_response, fresh_credential, retry_fn)
+
+              {:error, reason} ->
+                Logger.error("Retry after token refresh failed: #{inspect(reason)}")
+                decode_search_response(response)
+            end
+        end
+
+      {:error, reason} ->
+        # Don't log configuration errors as errors since we already logged a warning
+        case reason do
+          {:refresh_failed, :missing_client_id} ->
+            # Return refresh_failed error so LiveView can show appropriate message
+            {:error, {:refresh_failed, :missing_client_id}}
+
+          {:refresh_failed, :missing_client_secret} ->
+            # Return refresh_failed error so LiveView can show appropriate message
+            {:error, {:refresh_failed, :missing_client_secret}}
+
+          {:refresh_failed, _} = refresh_error ->
+            Logger.error("Token refresh failed: #{inspect(reason)}")
+            # Return refresh_failed error so LiveView can show appropriate message
+            {:error, refresh_error}
+
+          _ ->
+            Logger.error("Token refresh failed: #{inspect(reason)}")
+            # Return refresh_failed error so LiveView can show appropriate message
+            {:error, {:refresh_failed, reason}}
+        end
+    end
+  end
+
+  defp handle_search_response(%Tesla.Env{status: status, body: body}, _credential, _retry_fn) do
+    {:error, {:hubspot_error, status, body}}
+  end
+
+  # Handle get_contact API responses, automatically refreshing token on 401 errors
+  defp handle_get_contact_response(
+         %Tesla.Env{status: 200, body: %{"id" => _id}} = response,
+         _credential,
+         _contact_id
+       ) do
+    {:ok, response.body}
+  end
+
+  defp handle_get_contact_response(
+         %Tesla.Env{status: 401} = response,
+         credential,
+         contact_id
+       ) do
+    Logger.warning(
+      "HubSpot API returned 401 for user_id: #{credential.user_id}. Attempting token refresh."
+    )
+
+    # Try to refresh the token and retry the request
+    case refresh_token(credential) do
+      {:ok, _fresh_token} ->
+        # Reload the credential to get the updated token
+        case Repo.get(UserCredential, credential.id) do
+          nil ->
+            Logger.error("Could not reload credential after refresh")
+            {:error, {:hubspot_error, 401, response.body}}
+
+          fresh_credential ->
+            case Tesla.get(
+                   client(fresh_credential.token),
+                   "#{@contacts_path}/#{contact_id}",
+                   query: [properties: Enum.join(@default_properties, ",")]
+                 ) do
+              {:ok, retry_response} ->
+                handle_get_contact_response(retry_response, fresh_credential, contact_id)
+
+              {:error, reason} ->
+                Logger.error("Retry after token refresh failed: #{inspect(reason)}")
+                {:error, {:hubspot_error, 401, response.body}}
+            end
+        end
+
+      {:error, reason} ->
+        # Don't log configuration errors as errors since we already logged a warning
+        case reason do
+          {:refresh_failed, :missing_client_id} ->
+            # Return refresh_failed error so LiveView can show appropriate message
+            {:error, {:refresh_failed, :missing_client_id}}
+
+          {:refresh_failed, :missing_client_secret} ->
+            # Return refresh_failed error so LiveView can show appropriate message
+            {:error, {:refresh_failed, :missing_client_secret}}
+
+          {:refresh_failed, _} = refresh_error ->
+            Logger.error("Token refresh failed: #{inspect(reason)}")
+            # Return refresh_failed error so LiveView can show appropriate message
+            {:error, refresh_error}
+
+          _ ->
+            Logger.error("Token refresh failed: #{inspect(reason)}")
+            # Return refresh_failed error so LiveView can show appropriate message
+            {:error, {:refresh_failed, reason}}
+        end
+    end
+  end
+
+  defp handle_get_contact_response(%Tesla.Env{status: status, body: body}, _credential, _contact_id) do
+    {:error, {:hubspot_error, status, body}}
+  end
+
+  # Handle update API responses, automatically refreshing token on 401 errors
+  defp handle_update_response(
+         %Tesla.Env{status: status} = response,
+         _credential,
+         _contact_id,
+         _properties
+       )
+       when status in 200..299 do
+    decode_update_response(response)
+  end
+
+  defp handle_update_response(
+         %Tesla.Env{status: 401} = response,
+         credential,
+         contact_id,
+         properties
+       ) do
+    Logger.warning(
+      "HubSpot API returned 401 for user_id: #{credential.user_id}. Attempting token refresh."
+    )
+
+    # Try to refresh the token and retry the request
+    case refresh_token(credential) do
+      {:ok, _fresh_token} ->
+        # Reload the credential to get the updated token
+        case Repo.get(UserCredential, credential.id) do
+          nil ->
+            Logger.error("Could not reload credential after refresh")
+            decode_update_response(response)
+
+          fresh_credential ->
+            case Tesla.patch(
+                   client(fresh_credential.token),
+                   "#{@contacts_path}/#{contact_id}",
+                   %{properties: properties}
+                 ) do
+              {:ok, retry_response} ->
+                handle_update_response(retry_response, fresh_credential, contact_id, properties)
+
+              {:error, reason} ->
+                Logger.error("Retry after token refresh failed: #{inspect(reason)}")
+                decode_update_response(response)
+            end
+        end
+
+      {:error, reason} ->
+        # Don't log configuration errors as errors since we already logged a warning
+        case reason do
+          {:refresh_failed, :missing_client_id} ->
+            # Return refresh_failed error so LiveView can show appropriate message
+            {:error, {:refresh_failed, :missing_client_id}}
+
+          {:refresh_failed, :missing_client_secret} ->
+            # Return refresh_failed error so LiveView can show appropriate message
+            {:error, {:refresh_failed, :missing_client_secret}}
+
+          {:refresh_failed, _} = refresh_error ->
+            Logger.error("Token refresh failed: #{inspect(reason)}")
+            # Return refresh_failed error so LiveView can show appropriate message
+            {:error, refresh_error}
+
+          _ ->
+            Logger.error("Token refresh failed: #{inspect(reason)}")
+            # Return refresh_failed error so LiveView can show appropriate message
+            {:error, {:refresh_failed, reason}}
+        end
+    end
+  end
+
+  defp handle_update_response(%Tesla.Env{status: status, body: body}, _credential, _contact_id, _properties) do
+    {:error, {:hubspot_error, status, body}}
+  end
+
   defp client(token) when is_binary(token) do
     Tesla.client([
       {Tesla.Middleware.BaseUrl, @base_url},
@@ -151,33 +360,82 @@ defmodule SocialScribe.Hubspot.Api do
   end
 
   defp ensure_valid_token(%UserCredential{} = credential) do
+    # First check if token exists and is not empty
     cond do
+      is_nil(credential.token) or credential.token == "" ->
+        Logger.error("HubSpot credential missing access token for user_id: #{credential.user_id}")
+        {:error, :missing_token}
+
+      # If expires_at is nil, assume token doesn't expire (or is a long-lived token)
       is_nil(credential.expires_at) ->
         {:ok, credential.token}
 
+      # Token is still valid
       DateTime.compare(credential.expires_at, DateTime.utc_now()) == :gt ->
         {:ok, credential.token}
 
+      # Token is expired, try to refresh
       true ->
         refresh_token(credential)
     end
   end
 
   defp refresh_token(%UserCredential{} = credential) do
-    case HubspotTokenRefresher.refresh_token(credential.refresh_token) do
-      {:ok, %{"access_token" => _token} = token_data} ->
-        case Accounts.update_credential_tokens(credential, token_data) do
-          {:ok, updated} ->
-            {:ok, updated.token}
+    # Check if refresh_token exists before attempting refresh
+    if is_nil(credential.refresh_token) or credential.refresh_token == "" do
+      Logger.error(
+        "HubSpot credential missing refresh token for user_id: #{credential.user_id}. Re-authentication required."
+      )
 
-          {:error, changeset} ->
-            Logger.error("Failed to persist refreshed HubSpot token: #{inspect(changeset)}")
-            {:error, {:credential_update_failed, changeset}}
-        end
+      {:error, :missing_refresh_token}
+    else
+      # Check if OAuth config exists before attempting refresh
+      oauth_config = Application.get_env(:ueberauth, Ueberauth.Strategy.Hubspot.OAuth, [])
+      client_id = Keyword.get(oauth_config, :client_id)
+      client_secret = Keyword.get(oauth_config, :client_secret)
 
-      {:error, reason} ->
-        Logger.error("Failed to refresh HubSpot token: #{inspect(reason)}")
-        {:error, {:refresh_failed, reason}}
+      cond do
+        is_nil(client_id) or client_id == "" ->
+          Logger.warning(
+            "HubSpot OAuth configuration missing (client_id) for user_id: #{credential.user_id}. Cannot refresh token. Please set HUBSPOT_CLIENT_ID environment variable."
+          )
+
+          {:error, {:refresh_failed, :missing_client_id}}
+
+        is_nil(client_secret) or client_secret == "" ->
+          Logger.warning(
+            "HubSpot OAuth configuration missing (client_secret) for user_id: #{credential.user_id}. Cannot refresh token. Please set HUBSPOT_CLIENT_SECRET environment variable."
+          )
+
+          {:error, {:refresh_failed, :missing_client_secret}}
+
+        true ->
+          case HubspotTokenRefresher.refresh_token(credential.refresh_token) do
+            {:ok, %{"access_token" => _token} = token_data} ->
+              case Accounts.update_credential_tokens(credential, token_data) do
+                {:ok, updated} ->
+                  {:ok, updated.token}
+
+                {:error, changeset} ->
+                  Logger.error("Failed to persist refreshed HubSpot token: #{inspect(changeset)}")
+                  {:error, {:credential_update_failed, changeset}}
+              end
+
+            {:error, reason} ->
+              # Don't log configuration errors as errors since we already logged a warning
+              case reason do
+                :missing_client_id ->
+                  {:error, {:refresh_failed, reason}}
+
+                :missing_client_secret ->
+                  {:error, {:refresh_failed, reason}}
+
+                _ ->
+                  Logger.error("Failed to refresh HubSpot token: #{inspect(reason)}")
+                  {:error, {:refresh_failed, reason}}
+              end
+          end
+      end
     end
   end
 end

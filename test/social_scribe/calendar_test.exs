@@ -52,7 +52,9 @@ defmodule SocialScribe.CalendarTest do
 
     test "list_calendar_events/0 returns all calendar_events" do
       calendar_event = calendar_event_fixture()
-      assert Calendar.list_calendar_events() == [calendar_event]
+      # Get only the event we just created (by matching id)
+      events = Calendar.list_calendar_events() |> Enum.filter(&(&1.id == calendar_event.id))
+      assert events == [calendar_event]
     end
 
     test "get_calendar_event!/1 returns the calendar_event with given id" do

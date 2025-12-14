@@ -75,15 +75,20 @@ defmodule SocialScribe.Workers.ContactExtractionWorker do
   end
 
   defp persist_contact_info(meeting_transcript_id, contact_info) do
-    case Hubspot.get_extracted_contact_info_by_transcript(meeting_transcript_id) do
-      nil ->
-        Hubspot.create_extracted_contact_info(%{
-          contact_info: contact_info,
-          meeting_transcript_id: meeting_transcript_id
-        })
+    # Skip persisting if contact_info is nil (empty map from AI)
+    if contact_info == nil do
+      {:skip, :empty_contact_info}
+    else
+      case Hubspot.get_extracted_contact_info_by_transcript(meeting_transcript_id) do
+        nil ->
+          Hubspot.create_extracted_contact_info(%{
+            contact_info: contact_info,
+            meeting_transcript_id: meeting_transcript_id
+          })
 
-      _existing ->
-        {:skip, :already_exists}
+        _existing ->
+          {:skip, :already_exists}
+      end
     end
   end
 

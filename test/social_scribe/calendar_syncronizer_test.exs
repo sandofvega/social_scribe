@@ -9,6 +9,7 @@ defmodule SocialScribe.CalendarSyncronizerTest do
   alias SocialScribe.Calendar.CalendarEvent
   alias SocialScribe.TokenRefresherMock
   alias SocialScribe.GoogleCalendarApiMock, as: GoogleApiMock
+  import Ecto.Query
 
   # Mock data for a Google Calendar API response
   @mock_google_events [
@@ -64,7 +65,9 @@ defmodule SocialScribe.CalendarSyncronizerTest do
 
       assert {:ok, :sync_complete} = CalendarSyncronizer.sync_events_for_user(user)
 
-      assert Repo.aggregate(CalendarEvent, :count, :id) == 2
+      # Count only events for this user
+      event_count = Repo.aggregate(from(ce in CalendarEvent, where: ce.user_id == ^user.id), :count, :id)
+      assert event_count == 2
 
       zoom_event = Repo.get_by!(CalendarEvent, google_event_id: "zoom-event-123")
       assert zoom_event.summary == "Zoom Meeting"
@@ -100,7 +103,9 @@ defmodule SocialScribe.CalendarSyncronizerTest do
 
       assert {:ok, :sync_complete} = CalendarSyncronizer.sync_events_for_user(user)
 
-      assert Repo.aggregate(CalendarEvent, :count, :id) == 1
+      # Count only events for this user
+      event_count = Repo.aggregate(from(ce in CalendarEvent, where: ce.user_id == ^user.id), :count, :id)
+      assert event_count == 1
       assert Repo.get_by!(CalendarEvent, google_event_id: "zoom-event-123")
     end
   end

@@ -24,7 +24,7 @@ alwaysApply: false
 
 ## 4. AI-Generated Suggested Updates
 
-- Use the transcript + HubSpot contact data as input to AI.
+- Use the transcript as input to AI.
 - AI outputs a structured list of suggested field updates. Example:
   - Detected updated phone number from transcript.
   - Suggest: `phone` field should change from existing value to the new value.

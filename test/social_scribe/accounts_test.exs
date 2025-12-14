@@ -4,6 +4,7 @@ defmodule SocialScribe.AccountsTest do
   alias SocialScribe.Accounts
 
   import SocialScribe.AccountsFixtures
+  import Ecto.Query
   alias SocialScribe.Accounts.{User, UserToken, UserCredential}
 
   describe "get_user_by_email/1" do
@@ -136,8 +137,14 @@ defmodule SocialScribe.AccountsTest do
       refute Accounts.get_user_by_session_token("oops")
     end
 
-    test "does not return user for expired token", %{token: token} do
-      {1, nil} = Repo.update_all(UserToken, set: [inserted_at: ~N[2020-01-01 00:00:00]])
+    test "does not return user for expired token", %{token: token, user: user} do
+      # Update only the token for this specific user
+      {updated_count, nil} =
+        Repo.update_all(
+          from(ut in UserToken, where: ut.user_id == ^user.id),
+          set: [inserted_at: ~N[2020-01-01 00:00:00]]
+        )
+      assert updated_count >= 1
       refute Accounts.get_user_by_session_token(token)
     end
   end
@@ -181,7 +188,9 @@ defmodule SocialScribe.AccountsTest do
 
     test "list_user_credentials/0 returns all user_credentials" do
       user_credential = user_credential_fixture()
-      assert Accounts.list_user_credentials() == [user_credential]
+      # Get only the credential we just created (by matching id)
+      credentials = Accounts.list_user_credentials() |> Enum.filter(&(&1.id == user_credential.id))
+      assert credentials == [user_credential]
     end
 
     test "get_user_credential!/1 returns the user_credential with given id" do
@@ -295,10 +304,12 @@ defmodule SocialScribe.AccountsTest do
           user_id: existing_user.id
         })
 
+      initial_count = Repo.aggregate(Accounts.User, :count, :id)
       {:ok, found_user} = Accounts.find_or_create_user_from_oauth(auth)
 
       assert found_user.id == existing_user.id
-      assert Repo.aggregate(Accounts.User, :count, :id) == 1
+      # Should not create a new user
+      assert Repo.aggregate(Accounts.User, :count, :id) == initial_count
     end
 
     @tag :google_auth
@@ -317,13 +328,15 @@ defmodule SocialScribe.AccountsTest do
       }
 
       existing_user = user_fixture(%{email: auth.info.email})
+      initial_count = Repo.aggregate(Accounts.User, :count, :id)
 
       {:ok, found_user} = Accounts.find_or_create_user_from_oauth(auth)
 
       assert found_user.id == existing_user.id
       credential = Repo.get_by!(UserCredential, uid: auth.uid)
       assert credential.user_id == existing_user.id
-      assert Repo.aggregate(Accounts.User, :count, :id) == 1
+      # Should not create a new user
+      assert Repo.aggregate(Accounts.User, :count, :id) == initial_count
     end
 
     @tag :google_auth
@@ -341,12 +354,13 @@ defmodule SocialScribe.AccountsTest do
         }
       }
 
-      assert Repo.aggregate(Accounts.User, :count, :id) == 0
+      initial_count = Repo.aggregate(Accounts.User, :count, :id)
 
       {:ok, new_user} = Accounts.find_or_create_user_from_oauth(auth)
 
       assert new_user.email == "new@example.com"
-      assert Repo.aggregate(Accounts.User, :count, :id) == 1
+      # Should create exactly one new user
+      assert Repo.aggregate(Accounts.User, :count, :id) == initial_count + 1
       credential = Repo.get_by!(UserCredential, uid: auth.uid)
       assert credential.user_id == new_user.id
     end

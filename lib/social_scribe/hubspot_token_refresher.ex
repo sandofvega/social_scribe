@@ -19,28 +19,37 @@ defmodule SocialScribe.HubspotTokenRefresher do
   Refreshes a HubSpot access token using the refresh token.
   """
   def refresh_token(refresh_token_string) do
-    client_id = Application.fetch_env!(:ueberauth, Ueberauth.Strategy.Hubspot.OAuth)[:client_id]
+    oauth_config = Application.get_env(:ueberauth, Ueberauth.Strategy.Hubspot.OAuth, [])
 
-    client_secret =
-      Application.fetch_env!(:ueberauth, Ueberauth.Strategy.Hubspot.OAuth)[:client_secret]
+    client_id = Keyword.get(oauth_config, :client_id)
+    client_secret = Keyword.get(oauth_config, :client_secret)
 
-    body = %{
-      grant_type: "refresh_token",
-      client_id: client_id,
-      client_secret: client_secret,
-      refresh_token: refresh_token_string
-    }
+    cond do
+      is_nil(client_id) or client_id == "" ->
+        {:error, :missing_client_id}
 
-    # Use Tesla to make the POST request
-    case Tesla.post(client(), @hubspot_token_url, body, opts: [form_urlencoded: true]) do
-      {:ok, %Tesla.Env{status: 200, body: response_body}} ->
-        {:ok, response_body}
+      is_nil(client_secret) or client_secret == "" ->
+        {:error, :missing_client_secret}
 
-      {:ok, %Tesla.Env{status: status, body: error_body}} ->
-        {:error, {status, error_body}}
+      true ->
+        body = %{
+          grant_type: "refresh_token",
+          client_id: client_id,
+          client_secret: client_secret,
+          refresh_token: refresh_token_string
+        }
 
-      {:error, reason} ->
-        {:error, reason}
+        # Use Tesla to make the POST request
+        case Tesla.post(client(), @hubspot_token_url, body, opts: [form_urlencoded: true]) do
+          {:ok, %Tesla.Env{status: 200, body: response_body}} ->
+            {:ok, response_body}
+
+          {:ok, %Tesla.Env{status: status, body: error_body}} ->
+            {:error, {status, error_body}}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
     end
   end
 end

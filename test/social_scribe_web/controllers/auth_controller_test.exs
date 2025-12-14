@@ -3,7 +3,6 @@ defmodule SocialScribeWeb.AuthControllerTest do
 
   import SocialScribe.AccountsFixtures
   alias SocialScribe.Accounts
-  alias SocialScribe.Accounts.UserCredential
   alias Ueberauth.Auth
 
   describe "HubSpot OAuth callback" do
@@ -121,17 +120,6 @@ defmodule SocialScribeWeb.AuthControllerTest do
       assert updated_credential.id == existing_credential.id
       assert updated_credential.token == "new_access_token"
       assert updated_credential.refresh_token == "new_refresh_token"
-    end
-
-    test "shows error flash message on failed connection", %{conn: conn, user: user} do
-      # We need to simulate a failure scenario
-      # This would happen if Accounts.find_or_create_user_credential returns an error
-      # For testing purposes, we can't easily trigger this without mocking,
-      # but we can verify the error handling path exists
-
-      # The actual error would come from Accounts context
-      # Let's verify the controller handles errors properly by checking the code path
-      assert true
     end
   end
 

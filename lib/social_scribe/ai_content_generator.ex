@@ -65,6 +65,8 @@ defmodule SocialScribe.AIContentGenerator do
 
   @impl SocialScribe.AIContentGeneratorApi
   def extract_contact_information(transcript_text, host_names \\ [])
+
+  def extract_contact_information(transcript_text, host_names)
       when is_binary(transcript_text) and is_list(host_names) do
     duplicate_resolution =
       if Enum.empty?(host_names) do

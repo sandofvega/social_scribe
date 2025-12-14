@@ -26,7 +26,10 @@ defmodule SocialScribe.AutomationsTest do
       automation_2 = automation_fixture(%{user_id: user.id, is_active: true, platform: :facebook})
       _automation_4 = automation_fixture(%{is_active: true})
 
-      assert Automations.list_active_user_automations(user.id) == [automation_1, automation_2]
+      result = Automations.list_active_user_automations(user.id)
+      expected = [automation_1, automation_2]
+
+      assert Enum.sort_by(result, & &1.id) == Enum.sort_by(expected, & &1.id)
     end
 
     test "list_automations/0 returns all automations" do

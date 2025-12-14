@@ -36,6 +36,7 @@ defmodule SocialScribe.MixProject do
       {:oban, "~> 2.19"},
       {:igniter, "~> 0.5", only: [:dev]},
       {:mox, "~> 1.2", only: :test},
+      {:bypass, "~> 2.1", only: :test},
       {:timex, "~> 3.0"},
       {:tesla, "~> 1.14"},
       {:ueberauth_google, "~> 0.12.1"},

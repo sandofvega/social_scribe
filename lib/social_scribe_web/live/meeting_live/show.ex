@@ -189,42 +189,6 @@ defmodule SocialScribeWeb.MeetingLive.Show do
   end
 
   @impl true
-  def handle_event("clear-contact-search", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:selected_contact, nil)
-     |> assign(:contact_search_query, "")
-     |> assign(:contact_search_results, [])
-     |> assign(:contact_search_loading, false)
-     |> assign(:contact_search_no_results, false)
-     |> assign(:contact_search_error, nil)
-     |> assign(:hubspot_update_success, false)
-     |> assign(:hubspot_update_error, nil)}
-  end
-
-  @impl true
-  def handle_info({:perform_search, credential, query}, socket) do
-    case HubspotApi.search_contacts(credential, query) do
-      {:ok, results} ->
-        {:noreply,
-         socket
-         |> assign(:contact_search_results, results)
-         |> assign(:contact_search_loading, false)
-         |> assign(:contact_search_no_results, Enum.empty?(results))}
-
-      {:error, reason} ->
-        Logger.error("HubSpot contact search failed: #{inspect(reason)}")
-
-        {:noreply,
-         socket
-         |> assign(:contact_search_loading, false)
-         |> assign(:contact_search_results, [])
-         |> assign(:contact_search_no_results, false)
-         |> assign(:contact_search_error, "Unable to search contacts right now.")}
-    end
-  end
-
-  @impl true
   def handle_event("select-contact", %{"contact_id" => contact_id}, socket) do
     case socket.assigns.hubspot_credential do
       nil ->
@@ -252,13 +216,45 @@ defmodule SocialScribeWeb.MeetingLive.Show do
           {:error, reason} ->
             Logger.error("Failed to load HubSpot contact #{contact_id}: #{inspect(reason)}")
 
+            error_message =
+              case reason do
+                :missing_token ->
+                  "Your HubSpot connection is missing authentication. Please reconnect your HubSpot account in Settings."
+
+                :missing_refresh_token ->
+                  "Your HubSpot connection has expired. Please reconnect your HubSpot account in Settings."
+
+                {:refresh_failed, _} ->
+                  "Your HubSpot connection has expired. Please reconnect your HubSpot account in Settings."
+
+                {:hubspot_error, 401, _} ->
+                  "Authentication failed. Please reconnect your HubSpot account in Settings."
+
+                _ ->
+                  "Unable to load that contact. Please try again."
+              end
+
             {:noreply,
              socket
              |> assign(:contact_fetch_loading, false)
-             |> assign(:contact_fetch_error, "Unable to load that contact. Please try again.")
+             |> assign(:contact_fetch_error, error_message)
              |> assign(:contact_search_no_results, false)}
         end
     end
+  end
+
+  @impl true
+  def handle_event("clear-contact-search", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:selected_contact, nil)
+     |> assign(:contact_search_query, "")
+     |> assign(:contact_search_results, [])
+     |> assign(:contact_search_loading, false)
+     |> assign(:contact_search_no_results, false)
+     |> assign(:contact_search_error, nil)
+     |> assign(:hubspot_update_success, false)
+     |> assign(:hubspot_update_error, nil)}
   end
 
   @impl true
@@ -346,13 +342,93 @@ defmodule SocialScribeWeb.MeetingLive.Show do
             {:error, reason} ->
               Logger.error("HubSpot contact update failed: #{inspect(reason)}")
 
+              error_message =
+                case reason do
+                  :missing_token ->
+                    "Your HubSpot connection is missing authentication. Please reconnect your HubSpot account in Settings."
+
+                  :missing_refresh_token ->
+                    "Your HubSpot connection has expired. Please reconnect your HubSpot account in Settings."
+
+                  {:refresh_failed, _} ->
+                    "Your HubSpot connection has expired. Please reconnect your HubSpot account in Settings."
+
+                  {:hubspot_error, 401, _} ->
+                    "Authentication failed. Please reconnect your HubSpot account in Settings."
+
+                  _ ->
+                    "Unable to update HubSpot right now. Please try again."
+                end
+
               {:noreply,
                socket
                |> assign(:hubspot_update_loading, false)
-               |> put_flash(:error, "Unable to update HubSpot right now. Please try again.")
+               |> put_flash(:error, error_message)
                |> assign(:hubspot_update_success, false)}
           end
         end
+    end
+  end
+
+  @impl true
+  def handle_info({:perform_search, credential, query}, socket) do
+    case HubspotApi.search_contacts(credential, query) do
+      {:ok, results} ->
+        {:noreply,
+         socket
+         |> assign(:contact_search_results, results)
+         |> assign(:contact_search_loading, false)
+         |> assign(:contact_search_no_results, Enum.empty?(results))}
+
+      {:error, reason} ->
+        # Don't log refresh failures as errors since they're already logged during refresh attempt
+        case reason do
+          {:refresh_failed, :missing_client_id} ->
+            # Already logged as warning during refresh
+            nil
+
+          {:refresh_failed, :missing_client_secret} ->
+            # Already logged as warning during refresh
+            nil
+
+          {:refresh_failed, _} ->
+            # Already logged as error during refresh
+            nil
+
+          _ ->
+            Logger.error("HubSpot contact search failed: #{inspect(reason)}")
+        end
+
+        error_message =
+          case reason do
+            :missing_token ->
+              "Your HubSpot connection is missing authentication. Please reconnect your HubSpot account in Settings."
+
+            :missing_refresh_token ->
+              "Your HubSpot connection has expired. Please reconnect your HubSpot account in Settings."
+
+            {:refresh_failed, :missing_client_id} ->
+              "HubSpot configuration is missing. Please contact support."
+
+            {:refresh_failed, :missing_client_secret} ->
+              "HubSpot configuration is missing. Please contact support."
+
+            {:refresh_failed, _} ->
+              "Your HubSpot connection has expired. Please reconnect your HubSpot account in Settings."
+
+            {:hubspot_error, 401, _} ->
+              "Authentication failed. Please reconnect your HubSpot account in Settings."
+
+            _ ->
+              "Unable to search contacts right now. Please try again or reconnect your HubSpot account."
+          end
+
+        {:noreply,
+         socket
+         |> assign(:contact_search_loading, false)
+         |> assign(:contact_search_results, [])
+         |> assign(:contact_search_no_results, false)
+         |> assign(:contact_search_error, error_message)}
     end
   end
 

@@ -187,8 +187,14 @@ defmodule SocialScribe.Accounts do
 
   """
   def create_user_credential(attrs \\ %{}) do
+    changeset_fn =
+      case attrs[:provider] || attrs["provider"] do
+        "hubspot" -> &UserCredential.hubspot_changeset/2
+        _ -> &UserCredential.changeset/2
+      end
+
     %UserCredential{}
-    |> UserCredential.changeset(attrs)
+    |> changeset_fn.(attrs)
     |> Repo.insert()
   end
 

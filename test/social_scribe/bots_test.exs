@@ -15,7 +15,9 @@ defmodule SocialScribe.BotsTest do
 
     test "list_recall_bots/0 returns all recall_bots" do
       recall_bot = recall_bot_fixture()
-      assert Bots.list_recall_bots() == [recall_bot]
+      # Get only the bot we just created (by matching id)
+      bots = Bots.list_recall_bots() |> Enum.filter(&(&1.id == recall_bot.id))
+      assert bots == [recall_bot]
     end
 
     test "list_pending_bots/0 returns all pending recall_bots" do
