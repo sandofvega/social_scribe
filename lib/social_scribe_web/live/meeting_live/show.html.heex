@@ -181,9 +181,9 @@
           for={%{}}
           phx-change="search-contacts"
           phx-submit="search-contacts"
-          class="flex items-center justify-start border border-gray-300 rounded-md px-3 py-2 bg-white gap-3"
+          class="flex items-center justify-start border border-gray-300 rounded-md px-3 pt-0 pb-0 bg-white gap-3"
         >
-          <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-semibold">
+          <div class="w-[30px] h-[30px] rounded-full flex items-center justify-center text-white text-xs font-semibold" style="background-color: rgba(186, 186, 186, 1);">
             {contact_initials(@selected_contact)}
           </div>
           <input
@@ -191,7 +191,7 @@
             name="query"
             value={@contact_search_query}
             placeholder="Search HubSpot contacts by name or email"
-            class="flex-1 border-0 focus:ring-0 text-sm text-slate-700"
+            class="flex-1 border-0 focus:ring-0 text-sm text-slate-700 pl-0"
             phx-debounce="300"
             disabled={!@hubspot_credential}
           />
@@ -277,18 +277,21 @@
               phx-click="toggle-category"
               phx-value-category={category}
             />
-            <h3 class="text-base font-semibold text-slate-700">{humanize_category(category)}</h3>
+            <h3 class="text-lg font-semibold text-slate-700">{humanize_category(category)}</h3>
           </div>
           <div class="flex items-center gap-2">
-            <span class="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
+            <span class="px-2.5 py-1 text-xs font-medium rounded-full text-gray-700" style="background-color: rgba(222, 222, 222, 1);">
               {updates_selected_label(fields, @selected_fields)}
             </span>
-            <span class="text-sm text-indigo-600 cursor-default">Hide details</span>
+            <span class="text-sm cursor-default" style="color: rgba(99, 99, 99, 1);">Hide details</span>
           </div>
         </div>
-        <div class="ml-7 space-y-4">
+        <div class="space-y-4">
           <div :for={field <- fields}>
-            <div class="flex items-center gap-3 mb-2">
+            <div class="flex items-center gap-3 mb-2 ml-8">
+              <label class="text-sm text-slate-600 font-bold">{humanize_field(field)}</label>
+            </div>
+            <div class="flex items-center gap-3">
               <input
                 type="checkbox"
                 class="w-4 h-4 text-indigo-600 border-gray-300 rounded"
@@ -296,9 +299,6 @@
                 phx-click="toggle-field"
                 phx-value-field={field}
               />
-              <label class="text-sm text-slate-600">{humanize_field(field)}</label>
-            </div>
-            <div class="flex items-center gap-3 ml-7">
               <input
                 type="text"
                 value={
@@ -313,15 +313,11 @@
               />
               <svg
                 class="w-5 h-5 text-gray-400"
-                fill="none"
-                stroke="currentColor"
+                fill="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 5l7 7-7 7"
+                  d="M8 5v14l9-7-9-7z"
                 />
               </svg>
               <input
@@ -331,7 +327,7 @@
                 class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-white text-sm text-slate-700"
               />
             </div>
-            <a class="ml-7 text-sm text-indigo-600 hover:text-indigo-700 mt-1 block">
+            <a class="ml-[38px] text-sm text-indigo-600 hover:text-indigo-700 mt-1 block">
               Update mapping
             </a>
           </div>
