@@ -90,6 +90,29 @@ defmodule SocialScribe.Hubspot.Api do
     end
   end
 
+  @doc """
+  Update a HubSpot contact with the provided properties.
+  """
+  @spec update_contact(credential(), binary(), map()) :: :ok | {:error, term()}
+  def update_contact(%UserCredential{} = credential, contact_id, properties)
+      when is_binary(contact_id) and is_map(properties) and map_size(properties) > 0 do
+    with {:ok, token} <- ensure_valid_token(credential),
+         {:ok, response} <-
+           Tesla.patch(
+             client(token),
+             "#{@contacts_path}/#{contact_id}",
+             %{properties: properties}
+           ) do
+      decode_update_response(response)
+    else
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  def update_contact(_credential, _contact_id, _properties),
+    do: {:error, :no_properties_to_update}
+
   defp build_search_body(query, limit) do
     %{
       filterGroups: build_filter_groups(query),
@@ -118,6 +141,12 @@ defmodule SocialScribe.Hubspot.Api do
   end
 
   defp decode_search_response(%Tesla.Env{status: status, body: body}) do
+    {:error, {:hubspot_error, status, body}}
+  end
+
+  defp decode_update_response(%Tesla.Env{status: status}) when status in 200..299, do: :ok
+
+  defp decode_update_response(%Tesla.Env{status: status, body: body}) do
     {:error, {:hubspot_error, status, body}}
   end
 

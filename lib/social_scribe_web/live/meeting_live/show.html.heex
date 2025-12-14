@@ -186,7 +186,7 @@
             type="text"
             name="query"
             value={@contact_search_query}
-            placeholder="Search HubSpot contacts"
+            placeholder="Search HubSpot contacts by name or email"
             class="flex-1 border-0 focus:ring-0 text-sm text-slate-700"
             phx-debounce="300"
             disabled={!@hubspot_credential}
@@ -194,10 +194,11 @@
           <button
             type="button"
             phx-click="clear-contact-search"
-            class="text-sm text-slate-500 hover:text-slate-700 disabled:text-slate-400"
+            class="text-slate-500 hover:text-slate-700 disabled:text-slate-400 cursor-pointer disabled:cursor-not-allowed"
             disabled={@contact_search_query == ""}
           >
-            Clear
+            <.icon name="hero-x-mark-solid" class="w-4 h-4" />
+            <span class="sr-only">Clear</span>
           </button>
         </.form>
 
@@ -219,10 +220,24 @@
           </button>
         </div>
       </div>
-      <p :if={@contact_search_loading} class="text-sm text-slate-500 mt-2">
-        Searching contacts...
-      </p>
+      <div
+        :if={@contact_search_loading}
+        class="flex items-center gap-2 text-sm text-slate-500 mt-2"
+      >
+        <.icon name="hero-arrow-path" class="w-4 h-4 animate-spin" />
+        <span>Searching contacts...</span>
+      </div>
       <p :if={@contact_search_error} class="text-sm text-red-600 mt-2">{@contact_search_error}</p>
+      <div
+        :if={
+          @contact_search_no_results && @contact_search_query != "" && !@contact_search_loading &&
+            is_nil(@contact_search_error)
+        }
+        class="flex items-center gap-2 text-sm text-amber-600 mt-2"
+      >
+        <.icon name="hero-exclamation-triangle" class="w-4 h-4" />
+        <span>No HubSpot contacts found. Try a different search.</span>
+      </div>
       <p :if={!@hubspot_credential} class="text-sm text-amber-600 mt-2">
         Connect your HubSpot account to search and sync contacts.
       </p>
@@ -324,20 +339,67 @@
       <p class="text-sm text-slate-600">
         {@selected_category_count} categories, {@selected_field_count} fields selected
       </p>
-      <div class="flex items-center gap-3">
-        <button
-          type="button"
-          phx-click={JS.patch(~p"/dashboard/meetings/#{@meeting}")}
-          class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+      <div class="flex flex-col items-end gap-2">
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            phx-click={JS.patch(~p"/dashboard/meetings/#{@meeting}")}
+            class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <% disabled_reason =
+            cond do
+              is_nil(@selected_contact) && @selected_field_count == 0 ->
+                "Select a contact and at least one field to update"
+
+              is_nil(@selected_contact) ->
+                "Select a contact before updating HubSpot"
+
+              @selected_field_count == 0 ->
+                "Select at least one field to update"
+
+              true ->
+                nil
+            end %>
+          <% button_disabled = @hubspot_update_loading or not is_nil(disabled_reason) %>
+          <% button_title =
+            cond do
+              @hubspot_update_loading -> "Updating HubSpot..."
+              true -> disabled_reason
+            end %>
+          <button
+            type="button"
+            phx-click="update-hubspot"
+            phx-disable-with="Updating..."
+            class={[
+              "px-4 py-2 rounded-md text-sm font-medium transition-colors",
+              if(button_disabled,
+                do: "bg-gray-400 text-white cursor-not-allowed opacity-80",
+                else: "text-white bg-green-600 hover:bg-green-700"
+              )
+            ]}
+            disabled={button_disabled}
+            aria-disabled={button_disabled}
+            aria-busy={@hubspot_update_loading}
+            title={button_title}
+          >
+            <%= if @hubspot_update_loading do %>
+              Updating...
+            <% else %>
+              Update HubSpot
+            <% end %>
+          </button>
+        </div>
+        <p :if={@hubspot_update_error} class="text-sm text-red-600">
+          {@hubspot_update_error}
+        </p>
+        <p
+          :if={@hubspot_update_success && is_nil(@hubspot_update_error)}
+          class="text-sm text-green-600"
         >
-          Cancel
-        </button>
-        <button
-          type="button"
-          class="px-4 py-2 rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-        >
-          Update HubSpot
-        </button>
+          HubSpot updated successfully.
+        </p>
       </div>
     </div>
   </div>

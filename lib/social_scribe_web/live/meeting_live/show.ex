@@ -12,13 +12,13 @@ defmodule SocialScribeWeb.MeetingLive.Show do
   alias SocialScribe.Hubspot
   alias SocialScribe.Hubspot.Api, as: HubspotApi
 
-  @category_mapping %{
-    "identity" => ["first_name", "last_name", "date_of_birth"],
-    "contact_information" => ["email", "phone_number", "time_zone"],
-    "location" => ["city", "state", "country", "postal_code"],
-    "profession" => ["job_title", "company_name"],
-    "personal_information" => ["marital_status"]
-  }
+  @category_mapping [
+    {"identity", ["first_name", "last_name", "date_of_birth"]},
+    {"contact_information", ["email", "phone_number", "time_zone"]},
+    {"location", ["city", "state", "country", "postal_code"]},
+    {"profession", ["job_title", "company_name"]},
+    {"personal_information", ["marital_status"]}
+  ]
 
   @max_categories 4
 
@@ -93,12 +93,16 @@ defmodule SocialScribeWeb.MeetingLive.Show do
           Accounts.get_user_hubspot_credential(socket.assigns.current_user)
         )
         |> assign(:selected_contact, nil)
+        |> assign(:hubspot_update_loading, false)
+        |> assign(:hubspot_update_error, nil)
+        |> assign(:hubspot_update_success, false)
         |> assign(:contact_search_query, "")
         |> assign(:contact_search_results, [])
         |> assign(:contact_search_loading, false)
         |> assign(:contact_fetch_loading, false)
         |> assign(:contact_search_error, nil)
         |> assign(:contact_fetch_error, nil)
+        |> assign(:contact_search_no_results, false)
         |> assign(
           :follow_up_email_form,
           to_form(%{
@@ -142,7 +146,8 @@ defmodule SocialScribeWeb.MeetingLive.Show do
       {:noreply,
        socket
        |> assign(:contact_search_results, [])
-       |> assign(:contact_search_loading, false)}
+       |> assign(:contact_search_loading, false)
+       |> assign(:contact_search_no_results, false)}
     else
       case socket.assigns.hubspot_credential do
         nil ->
@@ -150,6 +155,7 @@ defmodule SocialScribeWeb.MeetingLive.Show do
            socket
            |> assign(:contact_search_results, [])
            |> assign(:contact_search_loading, false)
+           |> assign(:contact_search_no_results, false)
            |> assign(:contact_search_error, "Connect your HubSpot account to search contacts.")}
 
         credential ->
@@ -160,7 +166,8 @@ defmodule SocialScribeWeb.MeetingLive.Show do
               {:noreply,
                socket
                |> assign(:contact_search_results, results)
-               |> assign(:contact_search_loading, false)}
+               |> assign(:contact_search_loading, false)
+               |> assign(:contact_search_no_results, Enum.empty?(results))}
 
             {:error, reason} ->
               Logger.error("HubSpot contact search failed: #{inspect(reason)}")
@@ -169,6 +176,7 @@ defmodule SocialScribeWeb.MeetingLive.Show do
                socket
                |> assign(:contact_search_loading, false)
                |> assign(:contact_search_results, [])
+               |> assign(:contact_search_no_results, false)
                |> assign(:contact_search_error, "Unable to search contacts right now.")}
           end
       end
@@ -179,10 +187,14 @@ defmodule SocialScribeWeb.MeetingLive.Show do
   def handle_event("clear-contact-search", _params, socket) do
     {:noreply,
      socket
+     |> assign(:selected_contact, nil)
      |> assign(:contact_search_query, "")
      |> assign(:contact_search_results, [])
      |> assign(:contact_search_loading, false)
-     |> assign(:contact_search_error, nil)}
+     |> assign(:contact_search_no_results, false)
+     |> assign(:contact_search_error, nil)
+     |> assign(:hubspot_update_success, false)
+     |> assign(:hubspot_update_error, nil)}
   end
 
   @impl true
@@ -205,7 +217,10 @@ defmodule SocialScribeWeb.MeetingLive.Show do
              |> assign(:contact_fetch_loading, false)
              |> assign(:contact_fetch_error, nil)
              |> assign(:contact_search_results, [])
-             |> assign(:contact_search_query, contact_display_name(contact))}
+             |> assign(:contact_search_query, contact_display_name(contact))
+             |> assign(:contact_search_no_results, false)
+             |> assign(:hubspot_update_success, false)
+             |> assign(:hubspot_update_error, nil)}
 
           {:error, reason} ->
             Logger.error("Failed to load HubSpot contact #{contact_id}: #{inspect(reason)}")
@@ -213,7 +228,8 @@ defmodule SocialScribeWeb.MeetingLive.Show do
             {:noreply,
              socket
              |> assign(:contact_fetch_loading, false)
-             |> assign(:contact_fetch_error, "Unable to load that contact. Please try again.")}
+             |> assign(:contact_fetch_error, "Unable to load that contact. Please try again.")
+             |> assign(:contact_search_no_results, false)}
         end
     end
   end
@@ -248,6 +264,75 @@ defmodule SocialScribeWeb.MeetingLive.Show do
       |> assign(:follow_up_email_form, to_form(params))
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("update-hubspot", _params, socket) do
+    cond do
+      socket.assigns.hubspot_update_loading ->
+        {:noreply, socket}
+
+      is_nil(socket.assigns.hubspot_credential) ->
+        {:noreply,
+         socket
+         |> assign(:hubspot_update_error, "Connect your HubSpot account to sync updates.")
+         |> assign(:hubspot_update_success, false)}
+
+      is_nil(socket.assigns.selected_contact) ->
+        {:noreply,
+         socket
+         |> assign(:hubspot_update_error, "Select a HubSpot contact before updating.")
+         |> assign(:hubspot_update_success, false)}
+
+      socket.assigns.selected_field_count == 0 ->
+        {:noreply,
+         socket
+         |> assign(:hubspot_update_error, "Select at least one field to update.")
+         |> assign(:hubspot_update_success, false)}
+
+      true ->
+        updates =
+          build_hubspot_update_payload(
+            socket.assigns.selected_fields,
+            socket.assigns.contact_info_map
+          )
+
+        if map_size(updates) == 0 do
+          {:noreply,
+           socket
+           |> assign(
+             :hubspot_update_error,
+             "No extracted values available for the selected fields."
+           )
+           |> assign(:hubspot_update_success, false)}
+        else
+          credential = socket.assigns.hubspot_credential
+          contact_id = socket.assigns.selected_contact["id"]
+          socket = assign(socket, :hubspot_update_loading, true)
+
+          case HubspotApi.update_contact(credential, contact_id, updates) do
+            :ok ->
+              {:noreply,
+               socket
+               |> assign(:hubspot_update_loading, false)
+               |> assign(:hubspot_update_error, nil)
+               |> assign(:hubspot_update_success, true)
+               |> put_flash(:info, "HubSpot contact updated successfully.")}
+
+            {:error, reason} ->
+              Logger.error("HubSpot contact update failed: #{inspect(reason)}")
+
+              {:noreply,
+               socket
+               |> assign(:hubspot_update_loading, false)
+               |> assign(
+                 :hubspot_update_error,
+                 "Unable to update HubSpot right now. Please try again."
+               )
+               |> assign(:hubspot_update_success, false)}
+          end
+        end
+    end
   end
 
   defp extract_contact_info_map(nil), do: %{}
@@ -307,6 +392,8 @@ defmodule SocialScribeWeb.MeetingLive.Show do
       :selected_category_count,
       count_categories_with_selected_fields(categories, selected_fields)
     )
+    |> assign(:hubspot_update_success, false)
+    |> assign(:hubspot_update_error, nil)
   end
 
   defp count_selected_fields(selected_fields) do
@@ -400,6 +487,37 @@ defmodule SocialScribeWeb.MeetingLive.Show do
   defp get_extracted_field_value(contact_info_map, field) do
     Map.get(contact_info_map, field)
   end
+
+  defp build_hubspot_update_payload(selected_fields, contact_info_map) do
+    contact_info_map = contact_info_map || %{}
+
+    selected_fields
+    |> Enum.filter(fn {_field, selected?} -> selected? end)
+    |> Enum.reduce(%{}, fn {field, _}, acc ->
+      case normalize_extracted_value(get_extracted_field_value(contact_info_map, field)) do
+        nil ->
+          acc
+
+        value ->
+          property_key = Map.get(@hubspot_property_map, field, field)
+          Map.put(acc, property_key, value)
+      end
+    end)
+  end
+
+  defp normalize_extracted_value(nil), do: nil
+  defp normalize_extracted_value(""), do: nil
+
+  defp normalize_extracted_value(value) when is_binary(value) do
+    value
+    |> String.trim()
+    |> case do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp normalize_extracted_value(value), do: value
 
   defp format_field_value(nil), do: "No existing value"
   defp format_field_value(""), do: "No existing value"
