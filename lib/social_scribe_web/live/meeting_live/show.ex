@@ -164,9 +164,14 @@ defmodule SocialScribeWeb.MeetingLive.Show do
     if trimmed_query == "" do
       {:noreply,
        socket
+       |> assign(:selected_contact, nil)
        |> assign(:contact_search_results, [])
        |> assign(:contact_search_loading, false)
-       |> assign(:contact_search_no_results, false)}
+       |> assign(:contact_search_no_results, false)
+       |> assign(:contact_search_error, nil)
+       |> assign(:contact_fetch_error, nil)
+       |> assign(:hubspot_update_success, false)
+       |> assign(:hubspot_update_error, nil)}
     else
       case socket.assigns.hubspot_credential do
         nil ->

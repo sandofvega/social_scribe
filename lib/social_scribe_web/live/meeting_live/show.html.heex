@@ -403,8 +403,19 @@
       </div>
     </div>
 
-    <div class="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
-      <p class="text-sm text-slate-600">
+    <% available_categories_for_counter =
+      if @selected_contact do
+        filter_categories_with_differences(@organized_categories, @selected_contact, @contact_info_map)
+      else
+        @organized_categories
+      end %>
+    <% available_categories_ordered_for_counter = ordered_categories(available_categories_for_counter) |> Enum.take(@max_categories) %>
+    <% show_counter = !Enum.empty?(available_categories_ordered_for_counter) || is_nil(@selected_contact) %>
+    <div class={["flex items-center mt-8 pt-6 border-t border-gray-200", if(show_counter, do: "justify-between", else: "justify-end")]}>
+      <p
+        :if={show_counter}
+        class="text-sm text-slate-600"
+      >
         {@selected_category_count} categories, {@selected_field_count} fields selected
       </p>
       <div class="flex flex-col items-end gap-2">
@@ -416,8 +427,18 @@
           >
             Cancel
           </button>
+          <% available_categories =
+            if @selected_contact do
+              filter_categories_with_differences(@organized_categories, @selected_contact, @contact_info_map)
+            else
+              @organized_categories
+            end %>
+          <% has_available_fields = not Enum.empty?(available_categories) %>
           <% disabled_reason =
             cond do
+              !has_available_fields ->
+                "No fields available to update"
+
               is_nil(@selected_contact) && @selected_field_count == 0 ->
                 "Select a contact and at least one field to update"
 
