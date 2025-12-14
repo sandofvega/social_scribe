@@ -24,7 +24,7 @@ defmodule SocialScribe.AIContentGenerator do
     time_zone
   )
 
-  @gemini_model "gemini-2.0-flash-lite"
+  @gemini_model "gemini-2.0-flash"
   @gemini_api_base_url "https://generativelanguage.googleapis.com/v1beta/models"
 
   @impl SocialScribe.AIContentGeneratorApi

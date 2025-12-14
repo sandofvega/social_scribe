@@ -29,6 +29,29 @@
   <div class="flex flex-col gap-8">
     <div class="bg-white shadow-xl rounded-lg p-6 md:p-8">
       <h2 class="text-2xl font-semibold mb-4 text-slate-700">
+        HubSpot Contact Update
+      </h2>
+      <%= cond do %>
+        <% is_nil(@extracted_contact_info) -> %>
+          <p class="text-slate-500">
+            Waiting for AI to extract contact information from the meeting transcript...
+          </p>
+        <% is_nil(@extracted_contact_info.contact_info) || (@extracted_contact_info.contact_info == %{}) -> %>
+          <p class="text-slate-500">
+            No contact information found in the meeting.
+          </p>
+        <% true -> %>
+          <.link
+            patch={~p"/dashboard/meetings/#{@meeting}/review_update"}
+            class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            Review Update
+          </.link>
+      <% end %>
+    </div>
+
+    <div class="bg-white shadow-xl rounded-lg p-6 md:p-8">
+      <h2 class="text-2xl font-semibold mb-4 text-slate-700">
         AI Draft: Follow-Up Email
       </h2>
       <div class="prose prose-sm max-w-none space-y-4">
@@ -133,4 +156,189 @@
     current_user={@current_user}
     patch={~p"/dashboard/meetings/#{@meeting}"}
   />
+</.modal>
+
+<.modal
+  :if={@live_action == :review_update}
+  id="review-update-modal"
+  show
+  on_cancel={JS.patch(~p"/dashboard/meetings/#{@meeting}")}
+>
+  <div class="relative">
+    <h2 class="text-2xl font-bold mb-2 text-slate-800">Update in HubSpot</h2>
+    <p class="text-sm text-slate-600 mb-6">
+      Here are are suggested updates to sync with your integrations based on this meeting
+    </p>
+
+    <div class="mb-[10px]">
+      <label class="block text-sm font-semibold text-slate-700 mb-2">Select Contact</label>
+      <div class="relative">
+        <.form
+          for={%{}}
+          phx-change="search-contacts"
+          phx-submit="search-contacts"
+          class="flex items-center justify-start border border-gray-300 rounded-md px-3 py-2 bg-white gap-3"
+        >
+          <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-semibold">
+            {contact_initials(@selected_contact)}
+          </div>
+          <input
+            type="text"
+            name="query"
+            value={@contact_search_query}
+            placeholder="Search HubSpot contacts"
+            class="flex-1 border-0 focus:ring-0 text-sm text-slate-700"
+            phx-debounce="300"
+            disabled={!@hubspot_credential}
+          />
+          <button
+            type="button"
+            phx-click="clear-contact-search"
+            class="text-sm text-slate-500 hover:text-slate-700 disabled:text-slate-400"
+            disabled={@contact_search_query == ""}
+          >
+            Clear
+          </button>
+        </.form>
+
+        <div
+          :if={@contact_search_results != []}
+          class="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-y-auto"
+        >
+          <button
+            :for={result <- @contact_search_results}
+            type="button"
+            phx-click="select-contact"
+            phx-value-contact_id={result["id"]}
+            class="w-full text-left px-4 py-3 hover:bg-indigo-50 flex flex-col gap-1 border-b last:border-b-0 border-gray-100"
+          >
+            <span class="text-sm font-medium text-slate-700">{contact_display_name(result)}</span>
+            <span class="text-xs text-slate-500">
+              {Map.get(result["properties"] || %{}, "email", "No email")}
+            </span>
+          </button>
+        </div>
+      </div>
+      <p :if={@contact_search_loading} class="text-sm text-slate-500 mt-2">
+        Searching contacts...
+      </p>
+      <p :if={@contact_search_error} class="text-sm text-red-600 mt-2">{@contact_search_error}</p>
+      <p :if={!@hubspot_credential} class="text-sm text-amber-600 mt-2">
+        Connect your HubSpot account to search and sync contacts.
+      </p>
+      <p :if={@contact_fetch_loading} class="text-sm text-slate-500 mt-2">
+        Loading contact details...
+      </p>
+      <p :if={@contact_fetch_error} class="text-sm text-red-600 mt-2">{@contact_fetch_error}</p>
+    </div>
+
+    <div class="space-y-6 pt-[10px]">
+      <div
+        :if={Enum.empty?(ordered_categories(@organized_categories))}
+        class="p-5 bg-[#f7f7f7] rounded-[10px]"
+      >
+        <p class="text-sm text-slate-600">
+          Contact information from this meeting will appear here once it has been extracted.
+        </p>
+      </div>
+
+      <div
+        :for={
+          {category, fields} <-
+            ordered_categories(@organized_categories) |> Enum.take(@max_categories)
+        }
+        class="p-5 bg-[#f7f7f7] rounded-[10px]"
+      >
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <input
+              type="checkbox"
+              class="w-4 h-4 text-indigo-600 border-gray-300 rounded"
+              checked={Map.get(@selected_categories, category, false)}
+              phx-click="toggle-category"
+              phx-value-category={category}
+            />
+            <h3 class="text-base font-semibold text-slate-700">{humanize_category(category)}</h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
+              {updates_selected_label(fields, @selected_fields)}
+            </span>
+            <span class="text-sm text-indigo-600 cursor-default">Hide details</span>
+          </div>
+        </div>
+        <div class="ml-7 space-y-4">
+          <div :for={field <- fields}>
+            <div class="flex items-center gap-3 mb-2">
+              <input
+                type="checkbox"
+                class="w-4 h-4 text-indigo-600 border-gray-300 rounded"
+                checked={Map.get(@selected_fields, field, false)}
+                phx-click="toggle-field"
+                phx-value-field={field}
+              />
+              <label class="text-sm text-slate-600">{humanize_field(field)}</label>
+            </div>
+            <div class="flex items-center gap-3 ml-7">
+              <input
+                type="text"
+                value={
+                  if @selected_contact do
+                    format_field_value(get_hubspot_field_value(@selected_contact, field))
+                  else
+                    "Select a contact"
+                  end
+                }
+                readonly
+                class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-white text-sm text-slate-700"
+              />
+              <svg
+                class="w-5 h-5 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+              <input
+                type="text"
+                value={format_field_value(get_extracted_field_value(@contact_info_map, field))}
+                readonly
+                class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-white text-sm text-slate-700"
+              />
+            </div>
+            <a class="ml-7 text-sm text-indigo-600 hover:text-indigo-700 mt-1 block">
+              Update mapping
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
+      <p class="text-sm text-slate-600">
+        {@selected_category_count} categories, {@selected_field_count} fields selected
+      </p>
+      <div class="flex items-center gap-3">
+        <button
+          type="button"
+          phx-click={JS.patch(~p"/dashboard/meetings/#{@meeting}")}
+          class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="px-4 py-2 rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+        >
+          Update HubSpot
+        </button>
+      </div>
+    </div>
+  </div>
 </.modal>

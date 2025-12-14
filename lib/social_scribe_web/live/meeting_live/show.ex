@@ -1,11 +1,42 @@
 defmodule SocialScribeWeb.MeetingLive.Show do
   use SocialScribeWeb, :live_view
 
+  require Logger
+
   import SocialScribeWeb.PlatformLogo
   import SocialScribeWeb.ClipboardButton
 
+  alias SocialScribe.Accounts
   alias SocialScribe.Meetings
   alias SocialScribe.Automations
+  alias SocialScribe.Hubspot
+  alias SocialScribe.Hubspot.Api, as: HubspotApi
+
+  @category_mapping %{
+    "identity" => ["first_name", "last_name", "date_of_birth"],
+    "contact_information" => ["email", "phone_number", "time_zone"],
+    "location" => ["city", "state", "country", "postal_code"],
+    "profession" => ["job_title", "company_name"],
+    "personal_information" => ["marital_status"]
+  }
+
+  @max_categories 4
+
+  @hubspot_property_map %{
+    "first_name" => "firstname",
+    "last_name" => "lastname",
+    "email" => "email",
+    "phone_number" => "phone",
+    "time_zone" => "timezone",
+    "city" => "city",
+    "state" => "state",
+    "country" => "country",
+    "postal_code" => "zip",
+    "job_title" => "jobtitle",
+    "company_name" => "company",
+    "date_of_birth" => "dateofbirth",
+    "marital_status" => "maritalstatus"
+  }
 
   @impl true
   def mount(%{"id" => meeting_id}, _session, socket) do
@@ -17,6 +48,20 @@ defmodule SocialScribeWeb.MeetingLive.Show do
       |> Kernel.>(0)
 
     automation_results = Automations.list_automation_results_for_meeting(meeting_id)
+
+    extracted_contact_info =
+      if meeting.meeting_transcript do
+        Hubspot.get_extracted_contact_info_by_transcript(meeting.meeting_transcript.id)
+      else
+        nil
+      end
+
+    contact_info_map = extract_contact_info_map(extracted_contact_info)
+    organized_categories = organize_by_categories(contact_info_map)
+    default_selected_fields = build_initial_selected_fields(organized_categories)
+
+    selected_categories =
+      derive_selected_categories(organized_categories, default_selected_fields)
 
     if meeting.calendar_event.user_id != socket.assigns.current_user.id do
       socket =
@@ -32,6 +77,28 @@ defmodule SocialScribeWeb.MeetingLive.Show do
         |> assign(:meeting, meeting)
         |> assign(:automation_results, automation_results)
         |> assign(:user_has_automations, user_has_automations)
+        |> assign(:extracted_contact_info, extracted_contact_info)
+        |> assign(:contact_info_map, contact_info_map)
+        |> assign(:organized_categories, organized_categories)
+        |> assign(:selected_fields, default_selected_fields)
+        |> assign(:selected_categories, selected_categories)
+        |> assign(:selected_field_count, count_selected_fields(default_selected_fields))
+        |> assign(
+          :selected_category_count,
+          count_categories_with_selected_fields(organized_categories, default_selected_fields)
+        )
+        |> assign(:max_categories, @max_categories)
+        |> assign(
+          :hubspot_credential,
+          Accounts.get_user_hubspot_credential(socket.assigns.current_user)
+        )
+        |> assign(:selected_contact, nil)
+        |> assign(:contact_search_query, "")
+        |> assign(:contact_search_results, [])
+        |> assign(:contact_search_loading, false)
+        |> assign(:contact_fetch_loading, false)
+        |> assign(:contact_search_error, nil)
+        |> assign(:contact_fetch_error, nil)
         |> assign(
           :follow_up_email_form,
           to_form(%{
@@ -62,12 +129,206 @@ defmodule SocialScribeWeb.MeetingLive.Show do
   end
 
   @impl true
+  def handle_event("search-contacts", %{"query" => query}, socket) do
+    query = query || ""
+    trimmed_query = String.trim(query)
+
+    socket =
+      socket
+      |> assign(:contact_search_query, query)
+      |> assign(:contact_search_error, nil)
+
+    if trimmed_query == "" do
+      {:noreply,
+       socket
+       |> assign(:contact_search_results, [])
+       |> assign(:contact_search_loading, false)}
+    else
+      case socket.assigns.hubspot_credential do
+        nil ->
+          {:noreply,
+           socket
+           |> assign(:contact_search_results, [])
+           |> assign(:contact_search_loading, false)
+           |> assign(:contact_search_error, "Connect your HubSpot account to search contacts.")}
+
+        credential ->
+          socket = assign(socket, :contact_search_loading, true)
+
+          case HubspotApi.search_contacts(credential, trimmed_query) do
+            {:ok, results} ->
+              {:noreply,
+               socket
+               |> assign(:contact_search_results, results)
+               |> assign(:contact_search_loading, false)}
+
+            {:error, reason} ->
+              Logger.error("HubSpot contact search failed: #{inspect(reason)}")
+
+              {:noreply,
+               socket
+               |> assign(:contact_search_loading, false)
+               |> assign(:contact_search_results, [])
+               |> assign(:contact_search_error, "Unable to search contacts right now.")}
+          end
+      end
+    end
+  end
+
+  @impl true
+  def handle_event("clear-contact-search", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:contact_search_query, "")
+     |> assign(:contact_search_results, [])
+     |> assign(:contact_search_loading, false)
+     |> assign(:contact_search_error, nil)}
+  end
+
+  @impl true
+  def handle_event("select-contact", %{"contact_id" => contact_id}, socket) do
+    case socket.assigns.hubspot_credential do
+      nil ->
+        {:noreply,
+         socket
+         |> assign(:contact_fetch_error, "Connect your HubSpot account to select a contact.")
+         |> assign(:contact_fetch_loading, false)}
+
+      credential ->
+        socket = assign(socket, :contact_fetch_loading, true)
+
+        case HubspotApi.get_contact(credential, contact_id) do
+          {:ok, contact} ->
+            {:noreply,
+             socket
+             |> assign(:selected_contact, contact)
+             |> assign(:contact_fetch_loading, false)
+             |> assign(:contact_fetch_error, nil)
+             |> assign(:contact_search_results, [])
+             |> assign(:contact_search_query, contact_display_name(contact))}
+
+          {:error, reason} ->
+            Logger.error("Failed to load HubSpot contact #{contact_id}: #{inspect(reason)}")
+
+            {:noreply,
+             socket
+             |> assign(:contact_fetch_loading, false)
+             |> assign(:contact_fetch_error, "Unable to load that contact. Please try again.")}
+        end
+    end
+  end
+
+  @impl true
+  def handle_event("toggle-field", %{"field" => field}, socket) do
+    selected_fields = socket.assigns.selected_fields
+    current_value = Map.get(selected_fields, field, false)
+    updated_fields = Map.put(selected_fields, field, !current_value)
+
+    {:noreply, assign_selection(socket, updated_fields)}
+  end
+
+  @impl true
+  def handle_event("toggle-category", %{"category" => category}, socket) do
+    fields = Map.get(socket.assigns.organized_categories, category, [])
+    selected_fields = socket.assigns.selected_fields
+    turn_on = !Map.get(socket.assigns.selected_categories, category, false)
+
+    updated_fields =
+      Enum.reduce(fields, selected_fields, fn field, acc ->
+        Map.put(acc, field, turn_on)
+      end)
+
+    {:noreply, assign_selection(socket, updated_fields)}
+  end
+
+  @impl true
   def handle_event("validate-follow-up-email", params, socket) do
     socket =
       socket
       |> assign(:follow_up_email_form, to_form(params))
 
     {:noreply, socket}
+  end
+
+  defp extract_contact_info_map(nil), do: %{}
+
+  defp extract_contact_info_map(%{contact_info: %{} = contact_info}), do: contact_info
+
+  defp extract_contact_info_map(_), do: %{}
+
+  defp organize_by_categories(contact_info_map) when map_size(contact_info_map) == 0, do: %{}
+
+  defp organize_by_categories(contact_info_map) do
+    Enum.reduce(@category_mapping, %{}, fn {category, fields}, acc ->
+      available_fields =
+        fields
+        |> Enum.filter(&Map.has_key?(contact_info_map, &1))
+
+      if Enum.empty?(available_fields) do
+        acc
+      else
+        Map.put(acc, category, available_fields)
+      end
+    end)
+  end
+
+  defp ordered_categories(categories) do
+    @category_mapping
+    |> Enum.reduce([], fn {category, _fields}, acc ->
+      case Map.get(categories, category) do
+        nil -> acc
+        fields -> [{category, fields} | acc]
+      end
+    end)
+    |> Enum.reverse()
+  end
+
+  defp build_initial_selected_fields(categories) do
+    categories
+    |> Enum.flat_map(fn {_category, fields} -> fields end)
+    |> Enum.reduce(%{}, fn field, acc -> Map.put(acc, field, true) end)
+  end
+
+  defp derive_selected_categories(categories, selected_fields) do
+    Enum.reduce(categories, %{}, fn {category, fields}, acc ->
+      Map.put(acc, category, Enum.all?(fields, &Map.get(selected_fields, &1, false)))
+    end)
+  end
+
+  defp assign_selection(socket, selected_fields) do
+    categories = socket.assigns.organized_categories
+    selected_categories = derive_selected_categories(categories, selected_fields)
+
+    socket
+    |> assign(:selected_fields, selected_fields)
+    |> assign(:selected_categories, selected_categories)
+    |> assign(:selected_field_count, count_selected_fields(selected_fields))
+    |> assign(
+      :selected_category_count,
+      count_categories_with_selected_fields(categories, selected_fields)
+    )
+  end
+
+  defp count_selected_fields(selected_fields) do
+    selected_fields
+    |> Enum.count(fn {_field, selected?} -> selected? end)
+  end
+
+  defp count_categories_with_selected_fields(categories, selected_fields) do
+    categories
+    |> Enum.count(fn {_category, fields} ->
+      Enum.any?(fields, &Map.get(selected_fields, &1, false))
+    end)
+  end
+
+  defp selected_count_for_category(fields, selected_fields) do
+    Enum.count(fields, &Map.get(selected_fields, &1, false))
+  end
+
+  defp updates_selected_label(fields, selected_fields) do
+    count = selected_count_for_category(fields, selected_fields)
+    suffix = if count == 1, do: "update", else: "updates"
+    "#{count} #{suffix} selected"
   end
 
   defp format_duration(nil), do: "N/A"
@@ -83,6 +344,67 @@ defmodule SocialScribeWeb.MeetingLive.Show do
       true -> "Less than a second"
     end
   end
+
+  defp humanize_category(category) do
+    category
+    |> String.replace("_", " ")
+    |> String.split(" ", trim: true)
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  defp humanize_field(field) do
+    field
+    |> String.replace("_", " ")
+    |> String.capitalize()
+  end
+
+  defp contact_display_name(%{"properties" => properties}) do
+    first = String.trim(to_string(Map.get(properties, "firstname", "")))
+    last = String.trim(to_string(Map.get(properties, "lastname", "")))
+    email = Map.get(properties, "email")
+
+    cond do
+      first != "" and last != "" -> "#{first} #{last}"
+      first != "" -> first
+      email -> email
+      true -> "Unknown contact"
+    end
+  end
+
+  defp contact_display_name(_), do: "Unknown contact"
+
+  defp contact_initials(%{"properties" => properties}) do
+    first = String.first(String.trim(to_string(Map.get(properties, "firstname", ""))))
+    last = String.first(String.trim(to_string(Map.get(properties, "lastname", ""))))
+
+    ((first || "") <> (last || ""))
+    |> String.upcase()
+    |> String.slice(0, 2)
+    |> case do
+      "" -> "?"
+      initials -> initials
+    end
+  end
+
+  defp contact_initials(_), do: "?"
+
+  defp get_hubspot_field_value(nil, _field), do: nil
+
+  defp get_hubspot_field_value(%{"properties" => properties}, field) do
+    property_key = Map.get(@hubspot_property_map, field, field)
+    Map.get(properties, property_key)
+  end
+
+  defp get_hubspot_field_value(_contact, _field), do: nil
+
+  defp get_extracted_field_value(contact_info_map, field) do
+    Map.get(contact_info_map, field)
+  end
+
+  defp format_field_value(nil), do: "No existing value"
+  defp format_field_value(""), do: "No existing value"
+  defp format_field_value(value) when is_binary(value), do: value
+  defp format_field_value(value), do: to_string(value)
 
   attr :meeting_transcript, :map, required: true
 
