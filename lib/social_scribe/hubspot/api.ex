@@ -48,12 +48,14 @@ defmodule SocialScribe.Hubspot.Api do
         {:ok, []}
 
       true ->
+        search_body = build_search_body(query, limit)
+
         with {:ok, token} <- ensure_valid_token(credential),
              {:ok, response} <-
                Tesla.post(
                  client(token),
                  @search_path,
-                 build_search_body(query, limit)
+                 search_body
                ) do
           decode_search_response(response)
         else
@@ -115,25 +117,10 @@ defmodule SocialScribe.Hubspot.Api do
 
   defp build_search_body(query, limit) do
     %{
-      filterGroups: build_filter_groups(query),
       properties: @default_properties,
       limit: limit,
       query: query
     }
-  end
-
-  defp build_filter_groups(query) do
-    Enum.map(@searchable_fields, fn field ->
-      %{
-        filters: [
-          %{
-            propertyName: field,
-            operator: "CONTAINS_TOKEN",
-            value: query
-          }
-        ]
-      }
-    end)
   end
 
   defp decode_search_response(%Tesla.Env{status: 200, body: %{"results" => results}}) do

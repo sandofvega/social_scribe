@@ -311,7 +311,7 @@
                 nil
               end %>
               <% placeholder_text = cond do
-                is_nil(@selected_contact) -> "Select a contact"
+                is_nil(@selected_contact) -> nil
                 !has_real_value -> "No existing value"
                 true -> nil
               end %>
