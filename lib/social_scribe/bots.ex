@@ -123,7 +123,7 @@ defmodule SocialScribe.Bots do
     join_minute_offset =
       Map.get(user_bot_preference, :join_minute_offset, 2)
 
-    with {:ok, %{body: api_response}} <-
+    with {:ok, %{status: status, body: api_response}} when status in 200..299 <-
            RecallApi.create_bot(
              calendar_event.hangout_link,
              DateTime.add(
@@ -132,15 +132,28 @@ defmodule SocialScribe.Bots do
                :minute
              )
            ) do
+      status = case api_response do
+        %{status_changes: status_changes} when is_list(status_changes) and length(status_changes) > 0 ->
+          case List.first(status_changes) do
+            %{code: code} when is_binary(code) -> code
+            _ -> "pending"
+          end
+        _ -> "pending"
+      end
+
       create_recall_bot(%{
         user_id: user.id,
         calendar_event_id: calendar_event.id,
-        recall_bot_id: api_response.id,
+        recall_bot_id: Map.get(api_response, :id),
         meeting_url: calendar_event.hangout_link,
-        status: api_response.status_changes |> List.first() |> Map.get(:code)
+        status: status
       })
     else
-      {:error, reason} -> {:error, {:api_error, reason}}
+      {:ok, %{status: status, body: error_body}} ->
+        {:error, {:api_error, status, error_body}}
+
+      {:error, reason} ->
+        {:error, {:api_error, reason}}
     end
   end
 
@@ -170,15 +183,30 @@ defmodule SocialScribe.Bots do
     join_minute_offset =
       Map.get(user_bot_preference, :join_minute_offset, 2)
 
-    with {:ok, %{body: api_response}} <-
+    with {:ok, %{status: status_code, body: api_response}} when status_code in 200..299 <-
            RecallApi.update_bot(
              bot.recall_bot_id,
              calendar_event.hangout_link,
              DateTime.add(calendar_event.start_time, -join_minute_offset, :minute)
            ) do
+      status = case api_response do
+        %{status_changes: status_changes} when is_list(status_changes) and length(status_changes) > 0 ->
+          case List.first(status_changes) do
+            %{code: code} when is_binary(code) -> code
+            _ -> "pending"
+          end
+        _ -> "pending"
+      end
+
       update_recall_bot(bot, %{
-        status: api_response.status_changes |> List.first() |> Map.get(:code)
+        status: status
       })
+    else
+      {:ok, %{status: status, body: error_body}} ->
+        {:error, {:api_error, status, error_body}}
+
+      {:error, reason} ->
+        {:error, {:api_error, reason}}
     end
   end
 
