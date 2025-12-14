@@ -129,6 +129,24 @@ defmodule SocialScribeWeb.MeetingLive.Show do
 
   @impl true
   def handle_params(_params, _uri, socket) do
+    socket =
+      case socket.assigns[:live_action] do
+        :review_update ->
+          # When opening the modal, select all fields
+          organized_categories = socket.assigns.organized_categories
+          all_fields_selected = build_initial_selected_fields(organized_categories)
+          assign_selection(socket, all_fields_selected)
+
+        _ ->
+          # When closing the modal (or not in review_update), reset the selected contact
+          socket
+          |> assign(:selected_contact, nil)
+          |> assign(:contact_search_query, "")
+          |> assign(:contact_search_results, [])
+          |> assign(:hubspot_update_success, false)
+          |> assign(:hubspot_update_error, nil)
+      end
+
     {:noreply, socket}
   end
 
@@ -141,6 +159,7 @@ defmodule SocialScribeWeb.MeetingLive.Show do
       socket
       |> assign(:contact_search_query, query)
       |> assign(:contact_search_error, nil)
+      |> assign(:contact_search_no_results, false)
 
     if trimmed_query == "" do
       {:noreply,
@@ -161,24 +180,10 @@ defmodule SocialScribeWeb.MeetingLive.Show do
         credential ->
           socket = assign(socket, :contact_search_loading, true)
 
-          case HubspotApi.search_contacts(credential, trimmed_query) do
-            {:ok, results} ->
-              {:noreply,
-               socket
-               |> assign(:contact_search_results, results)
-               |> assign(:contact_search_loading, false)
-               |> assign(:contact_search_no_results, Enum.empty?(results))}
+          # Send intermediate reply to trigger render with loading state
+          send(self(), {:perform_search, credential, trimmed_query})
 
-            {:error, reason} ->
-              Logger.error("HubSpot contact search failed: #{inspect(reason)}")
-
-              {:noreply,
-               socket
-               |> assign(:contact_search_loading, false)
-               |> assign(:contact_search_results, [])
-               |> assign(:contact_search_no_results, false)
-               |> assign(:contact_search_error, "Unable to search contacts right now.")}
-          end
+          {:noreply, socket}
       end
     end
   end
@@ -195,6 +200,28 @@ defmodule SocialScribeWeb.MeetingLive.Show do
      |> assign(:contact_search_error, nil)
      |> assign(:hubspot_update_success, false)
      |> assign(:hubspot_update_error, nil)}
+  end
+
+  @impl true
+  def handle_info({:perform_search, credential, query}, socket) do
+    case HubspotApi.search_contacts(credential, query) do
+      {:ok, results} ->
+        {:noreply,
+         socket
+         |> assign(:contact_search_results, results)
+         |> assign(:contact_search_loading, false)
+         |> assign(:contact_search_no_results, Enum.empty?(results))}
+
+      {:error, reason} ->
+        Logger.error("HubSpot contact search failed: #{inspect(reason)}")
+
+        {:noreply,
+         socket
+         |> assign(:contact_search_loading, false)
+         |> assign(:contact_search_results, [])
+         |> assign(:contact_search_no_results, false)
+         |> assign(:contact_search_error, "Unable to search contacts right now.")}
+    end
   end
 
   @impl true
