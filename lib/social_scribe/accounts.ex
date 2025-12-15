@@ -304,7 +304,17 @@ defmodule SocialScribe.Accounts do
         create_user_credential(format_credential_attrs(user, auth))
 
       %UserCredential{} = credential ->
-        update_user_credential(credential, format_credential_attrs(user, auth))
+        attrs = format_credential_attrs(user, auth)
+
+        # Preserve existing refresh_token if new one is nil (Google may not return refresh_token on subsequent logins)
+        attrs =
+          if (attrs[:refresh_token] || attrs["refresh_token"]) == nil && credential.refresh_token do
+            Map.put(attrs, :refresh_token, credential.refresh_token)
+          else
+            attrs
+          end
+
+        update_user_credential(credential, attrs)
     end
   end
 
@@ -377,6 +387,7 @@ defmodule SocialScribe.Accounts do
       provider: to_string(auth.provider),
       uid: auth.uid,
       token: auth.credentials.token,
+      refresh_token: nil,
       expires_at:
         (auth.credentials.expires_at && DateTime.from_unix!(auth.credentials.expires_at)) ||
           DateTime.add(DateTime.utc_now(), 3600, :second),

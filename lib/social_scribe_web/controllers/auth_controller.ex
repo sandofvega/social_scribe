@@ -139,24 +139,6 @@ defmodule SocialScribeWeb.AuthController do
   end
 
   def callback(conn, _params) do
-    # #region agent log
-    log_debug("auth_callback_fallback", %{
-      provider: conn.params["provider"],
-      has_ueberauth_auth: Map.has_key?(conn.assigns, :ueberauth_auth),
-      has_ueberauth_failure: Map.has_key?(conn.assigns, :ueberauth_failure),
-      ueberauth_failure:
-        if(Map.has_key?(conn.assigns, :ueberauth_failure),
-          do: inspect(conn.assigns.ueberauth_failure),
-          else: nil
-        ),
-      callback_params: conn.params,
-      callback_state: conn.params["state"],
-      session_cookie: Map.get(conn.cookies, "ueberauth.state_param"),
-      assigns_keys: Map.keys(conn.assigns)
-    })
-
-    # #endregion
-
     Logger.error("OAuth Login")
     Logger.error(conn)
 
@@ -164,29 +146,4 @@ defmodule SocialScribeWeb.AuthController do
     |> put_flash(:error, "There was an error signing you in. Please try again.")
     |> redirect(to: ~p"/")
   end
-
-  # #region agent log
-  defp log_debug(message, data) do
-    log_path = "/home/sand/projects/social_scribe/.cursor/debug.log"
-    timestamp = System.system_time(:millisecond)
-
-    log_entry =
-      %{
-        id: "log_#{timestamp}_#{:rand.uniform(10000)}",
-        timestamp: timestamp,
-        location: "lib/social_scribe_web/controllers/auth_controller.ex",
-        message: message,
-        data: data,
-        sessionId: "debug-session",
-        runId: "run1"
-      }
-      |> Jason.encode!()
-      |> Kernel.<>("\n")
-
-    File.write!(log_path, log_entry, [:append])
-  rescue
-    _ -> :ok
-  end
-
-  # #endregion
 end
