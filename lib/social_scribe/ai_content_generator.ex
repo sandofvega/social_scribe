@@ -97,6 +97,7 @@ defmodule SocialScribe.AIContentGenerator do
     - Do NOT make up or infer contact information
     - Capitalize the first character of each word in text fields (e.g., names, job titles, company names, cities)
     - Remove all spaces from email addresses
+    - Only extract email addresses that have a valid email format. If an email address does not have a valid format, ignore it and do not include it in the response
     - If no contact information is found in the transcript, return an empty JSON object: {}
     - Return ONLY valid JSON, no additional text
 
