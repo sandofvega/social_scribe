@@ -126,7 +126,9 @@ defmodule SocialScribe.MeetingsTest do
     test "list_meeting_transcripts/0 returns all meeting_transcripts" do
       meeting_transcript = meeting_transcript_fixture()
       # Get only the transcript we just created (by matching id)
-      transcripts = Meetings.list_meeting_transcripts() |> Enum.filter(&(&1.id == meeting_transcript.id))
+      transcripts =
+        Meetings.list_meeting_transcripts() |> Enum.filter(&(&1.id == meeting_transcript.id))
+
       assert transcripts == [meeting_transcript]
     end
 
@@ -191,7 +193,9 @@ defmodule SocialScribe.MeetingsTest do
     test "list_meeting_participants/0 returns all meeting_participants" do
       meeting_participant = meeting_participant_fixture()
       # Get only the participant we just created (by matching id)
-      participants = Meetings.list_meeting_participants() |> Enum.filter(&(&1.id == meeting_participant.id))
+      participants =
+        Meetings.list_meeting_participants() |> Enum.filter(&(&1.id == meeting_participant.id))
+
       assert participants == [meeting_participant]
     end
 

@@ -22,7 +22,17 @@ defmodule SocialScribe.Recall do
   def create_bot(meeting_url, join_at) do
     body = %{
       meeting_url: meeting_url,
-      join_at: Timex.format!(join_at, "{ISO:Extended}")
+      join_at: Timex.format!(join_at, "{ISO:Extended}"),
+      recording_config: %{
+        transcript: %{
+          provider: %{
+            recallai_streaming: %{
+              mode: "prioritize_accuracy",
+              language_code: "en"
+            }
+          }
+        }
+      }
     }
 
     Tesla.post(client(), "/bot", body)
@@ -32,7 +42,17 @@ defmodule SocialScribe.Recall do
   def update_bot(recall_bot_id, meeting_url, join_at) do
     body = %{
       meeting_url: meeting_url,
-      join_at: Timex.format!(join_at, "{ISO:Extended}")
+      join_at: Timex.format!(join_at, "{ISO:Extended}"),
+      recording_config: %{
+        transcript: %{
+          provider: %{
+            recallai_streaming: %{
+              mode: "prioritize_accuracy",
+              language_code: "en"
+            }
+          }
+        }
+      }
     }
 
     Tesla.patch(client(), "/bot/#{recall_bot_id}", body)

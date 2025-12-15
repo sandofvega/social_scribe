@@ -25,7 +25,9 @@ defmodule SocialScribe.Workers.ContactExtractionWorkerTest do
       user = user_fixture()
       calendar_event = calendar_event_fixture(%{user_id: user.id})
       recall_bot = recall_bot_fixture(%{calendar_event_id: calendar_event.id, user_id: user.id})
-      meeting = meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
+
+      meeting =
+        meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
 
       meeting_participant_fixture(%{meeting_id: meeting.id, is_host: true, name: "John Doe"})
 
@@ -44,10 +46,11 @@ defmodule SocialScribe.Workers.ContactExtractionWorkerTest do
         ]
       }
 
-      meeting_transcript = meeting_transcript_fixture(%{
-        meeting_id: meeting.id,
-        content: transcript_content
-      })
+      meeting_transcript =
+        meeting_transcript_fixture(%{
+          meeting_id: meeting.id,
+          content: transcript_content
+        })
 
       contact_info = %{
         "first_name" => "John",
@@ -76,14 +79,17 @@ defmodule SocialScribe.Workers.ContactExtractionWorkerTest do
       user = user_fixture()
       calendar_event = calendar_event_fixture(%{user_id: user.id})
       recall_bot = recall_bot_fixture(%{calendar_event_id: calendar_event.id, user_id: user.id})
-      meeting = meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
+
+      meeting =
+        meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
 
       meeting_participant_fixture(%{meeting_id: meeting.id, is_host: true})
 
-      meeting_transcript = meeting_transcript_fixture(%{
-        meeting_id: meeting.id,
-        content: %{"data" => []}
-      })
+      meeting_transcript =
+        meeting_transcript_fixture(%{
+          meeting_id: meeting.id,
+          content: %{"data" => []}
+        })
 
       job_args = %{"meeting_transcript_id" => meeting_transcript.id}
 
@@ -98,7 +104,9 @@ defmodule SocialScribe.Workers.ContactExtractionWorkerTest do
       user = user_fixture()
       calendar_event = calendar_event_fixture(%{user_id: user.id})
       recall_bot = recall_bot_fixture(%{calendar_event_id: calendar_event.id, user_id: user.id})
-      _meeting = meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
+
+      _meeting =
+        meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
 
       job_args = %{"meeting_transcript_id" => 999_999}
 
@@ -110,7 +118,9 @@ defmodule SocialScribe.Workers.ContactExtractionWorkerTest do
       user = user_fixture()
       calendar_event = calendar_event_fixture(%{user_id: user.id})
       recall_bot = recall_bot_fixture(%{calendar_event_id: calendar_event.id, user_id: user.id})
-      meeting = meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
+
+      meeting =
+        meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
 
       meeting_participant_fixture(%{meeting_id: meeting.id, is_host: true})
 
@@ -123,10 +133,11 @@ defmodule SocialScribe.Workers.ContactExtractionWorkerTest do
         ]
       }
 
-      meeting_transcript = meeting_transcript_fixture(%{
-        meeting_id: meeting.id,
-        content: transcript_content
-      })
+      meeting_transcript =
+        meeting_transcript_fixture(%{
+          meeting_id: meeting.id,
+          content: transcript_content
+        })
 
       expect(AIGeneratorMock, :extract_contact_information, fn _transcript_text, _host_names ->
         {:error, :gemini_api_timeout}
@@ -146,7 +157,9 @@ defmodule SocialScribe.Workers.ContactExtractionWorkerTest do
       user = user_fixture()
       calendar_event = calendar_event_fixture(%{user_id: user.id})
       recall_bot = recall_bot_fixture(%{calendar_event_id: calendar_event.id, user_id: user.id})
-      meeting = meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
+
+      meeting =
+        meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
 
       meeting_participant_fixture(%{meeting_id: meeting.id, is_host: true})
 
@@ -159,10 +172,11 @@ defmodule SocialScribe.Workers.ContactExtractionWorkerTest do
         ]
       }
 
-      meeting_transcript = meeting_transcript_fixture(%{
-        meeting_id: meeting.id,
-        content: transcript_content
-      })
+      meeting_transcript =
+        meeting_transcript_fixture(%{
+          meeting_id: meeting.id,
+          content: transcript_content
+        })
 
       # Create existing contact info
       extracted_contact_info_fixture(%{
@@ -195,7 +209,9 @@ defmodule SocialScribe.Workers.ContactExtractionWorkerTest do
       user = user_fixture()
       calendar_event = calendar_event_fixture(%{user_id: user.id})
       recall_bot = recall_bot_fixture(%{calendar_event_id: calendar_event.id, user_id: user.id})
-      meeting = meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
+
+      meeting =
+        meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
 
       meeting_participant_fixture(%{meeting_id: meeting.id, is_host: true})
 
@@ -208,10 +224,11 @@ defmodule SocialScribe.Workers.ContactExtractionWorkerTest do
         ]
       }
 
-      meeting_transcript = meeting_transcript_fixture(%{
-        meeting_id: meeting.id,
-        content: transcript_content
-      })
+      meeting_transcript =
+        meeting_transcript_fixture(%{
+          meeting_id: meeting.id,
+          content: transcript_content
+        })
 
       expect(AIGeneratorMock, :extract_contact_information, fn _transcript_text, _host_names ->
         {:ok, %{}}
@@ -237,13 +254,16 @@ defmodule SocialScribe.Workers.ContactExtractionWorkerTest do
       user = user_fixture()
       calendar_event = calendar_event_fixture(%{user_id: user.id})
       recall_bot = recall_bot_fixture(%{calendar_event_id: calendar_event.id, user_id: user.id})
-      meeting = meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
 
-      _host_participant = meeting_participant_fixture(%{
-        meeting_id: meeting.id,
-        is_host: true,
-        name: "Jane Smith"
-      })
+      meeting =
+        meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
+
+      _host_participant =
+        meeting_participant_fixture(%{
+          meeting_id: meeting.id,
+          is_host: true,
+          name: "Jane Smith"
+        })
 
       transcript_content = %{
         "data" => [
@@ -259,10 +279,11 @@ defmodule SocialScribe.Workers.ContactExtractionWorkerTest do
         ]
       }
 
-      meeting_transcript = meeting_transcript_fixture(%{
-        meeting_id: meeting.id,
-        content: transcript_content
-      })
+      meeting_transcript =
+        meeting_transcript_fixture(%{
+          meeting_id: meeting.id,
+          content: transcript_content
+        })
 
       expect(AIGeneratorMock, :extract_contact_information, fn transcript_text, host_names ->
         # Verify transcript text includes the speaker and words

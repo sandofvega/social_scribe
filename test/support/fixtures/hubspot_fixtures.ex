@@ -114,12 +114,14 @@ defmodule SocialScribe.HubspotFixtures do
       attrs[:meeting_transcript_id] ||
         meeting_transcript_fixture().id
 
-    contact_info = attrs[:contact_info] || %{
-      "first_name" => "Jane",
-      "last_name" => "Smith",
-      "email" => "jane.smith@example.com",
-      "phone_number" => "+1987654321"
-    }
+    contact_info =
+      attrs[:contact_info] ||
+        %{
+          "first_name" => "Jane",
+          "last_name" => "Smith",
+          "email" => "jane.smith@example.com",
+          "phone_number" => "+1987654321"
+        }
 
     {:ok, extracted_info} =
       SocialScribe.Hubspot.create_extracted_contact_info(%{

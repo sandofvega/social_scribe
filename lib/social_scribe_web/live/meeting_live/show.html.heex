@@ -266,11 +266,16 @@
 
       <% filtered_categories =
         if @selected_contact do
-          filter_categories_with_differences(@organized_categories, @selected_contact, @contact_info_map)
+          filter_categories_with_differences(
+            @organized_categories,
+            @selected_contact,
+            @contact_info_map
+          )
         else
           @organized_categories
         end %>
-      <% filtered_categories_ordered = ordered_categories(filtered_categories) |> Enum.take(@max_categories) %>
+      <% filtered_categories_ordered =
+        ordered_categories(filtered_categories) |> Enum.take(@max_categories) %>
 
       <div
         :if={Enum.empty?(filtered_categories_ordered) && @selected_contact}
@@ -285,9 +290,7 @@
       </div>
 
       <div
-        :for={
-          {category, fields} <- filtered_categories_ordered
-        }
+        :for={{category, fields} <- filtered_categories_ordered}
         class="p-5 bg-[#f7f7f7] rounded-[10px]"
       >
         <% filtered_fields =
@@ -405,13 +408,22 @@
 
     <% available_categories_for_counter =
       if @selected_contact do
-        filter_categories_with_differences(@organized_categories, @selected_contact, @contact_info_map)
+        filter_categories_with_differences(
+          @organized_categories,
+          @selected_contact,
+          @contact_info_map
+        )
       else
         @organized_categories
       end %>
-    <% available_categories_ordered_for_counter = ordered_categories(available_categories_for_counter) |> Enum.take(@max_categories) %>
-    <% show_counter = !Enum.empty?(available_categories_ordered_for_counter) || is_nil(@selected_contact) %>
-    <div class={["flex items-center mt-8 pt-6 border-t border-gray-200", if(show_counter, do: "justify-between", else: "justify-end")]}>
+    <% available_categories_ordered_for_counter =
+      ordered_categories(available_categories_for_counter) |> Enum.take(@max_categories) %>
+    <% show_counter =
+      !Enum.empty?(available_categories_ordered_for_counter) || is_nil(@selected_contact) %>
+    <div class={[
+      "flex items-center mt-8 pt-6 border-t border-gray-200",
+      if(show_counter, do: "justify-between", else: "justify-end")
+    ]}>
       <p
         :if={show_counter}
         class="text-sm text-slate-600"
@@ -429,7 +441,11 @@
           </button>
           <% available_categories =
             if @selected_contact do
-              filter_categories_with_differences(@organized_categories, @selected_contact, @contact_info_map)
+              filter_categories_with_differences(
+                @organized_categories,
+                @selected_contact,
+                @contact_info_map
+              )
             else
               @organized_categories
             end %>

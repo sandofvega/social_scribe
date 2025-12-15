@@ -67,9 +67,10 @@ defmodule SocialScribe.Hubspot.ApiTest do
 
   describe "token management" do
     test "ensure_valid_token returns token when not expired" do
-      _credential = hubspot_credential_fixture(%{
-        expires_at: DateTime.add(DateTime.utc_now(), 3600, :second)
-      })
+      _credential =
+        hubspot_credential_fixture(%{
+          expires_at: DateTime.add(DateTime.utc_now(), 3600, :second)
+        })
 
       # This is a private function, but we can test it indirectly through public functions
       # The token should be valid and not trigger a refresh

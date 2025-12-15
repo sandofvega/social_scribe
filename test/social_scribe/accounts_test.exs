@@ -144,6 +144,7 @@ defmodule SocialScribe.AccountsTest do
           from(ut in UserToken, where: ut.user_id == ^user.id),
           set: [inserted_at: ~N[2020-01-01 00:00:00]]
         )
+
       assert updated_count >= 1
       refute Accounts.get_user_by_session_token(token)
     end
@@ -189,7 +190,9 @@ defmodule SocialScribe.AccountsTest do
     test "list_user_credentials/0 returns all user_credentials" do
       user_credential = user_credential_fixture()
       # Get only the credential we just created (by matching id)
-      credentials = Accounts.list_user_credentials() |> Enum.filter(&(&1.id == user_credential.id))
+      credentials =
+        Accounts.list_user_credentials() |> Enum.filter(&(&1.id == user_credential.id))
+
       assert credentials == [user_credential]
     end
 

@@ -25,7 +25,9 @@ defmodule SocialScribe.Hubspot.IntegrationTest do
 
       calendar_event = calendar_event_fixture(%{user_id: user.id})
       recall_bot = recall_bot_fixture(%{calendar_event_id: calendar_event.id, user_id: user.id})
-      meeting = meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
+
+      meeting =
+        meeting_fixture(%{calendar_event_id: calendar_event.id, recall_bot_id: recall_bot.id})
 
       meeting_participant_fixture(%{meeting_id: meeting.id, is_host: true})
 
@@ -43,20 +45,22 @@ defmodule SocialScribe.Hubspot.IntegrationTest do
         ]
       }
 
-      meeting_transcript = meeting_transcript_fixture(%{
-        meeting_id: meeting.id,
-        content: transcript_content
-      })
+      meeting_transcript =
+        meeting_transcript_fixture(%{
+          meeting_id: meeting.id,
+          content: transcript_content
+        })
 
       # Create extracted contact info (simulating what the worker would do)
-      extracted_info = extracted_contact_info_fixture(%{
-        meeting_transcript_id: meeting_transcript.id,
-        contact_info: %{
-          "first_name" => "John",
-          "last_name" => "Doe",
-          "email" => "john@example.com"
-        }
-      })
+      extracted_info =
+        extracted_contact_info_fixture(%{
+          meeting_transcript_id: meeting_transcript.id,
+          contact_info: %{
+            "first_name" => "John",
+            "last_name" => "Doe",
+            "email" => "john@example.com"
+          }
+        })
 
       # Verify the flow components work together
       assert extracted_info != nil

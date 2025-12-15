@@ -269,7 +269,11 @@ defmodule SocialScribe.Hubspot.Api do
     end
   end
 
-  defp handle_get_contact_response(%Tesla.Env{status: status, body: body}, _credential, _contact_id) do
+  defp handle_get_contact_response(
+         %Tesla.Env{status: status, body: body},
+         _credential,
+         _contact_id
+       ) do
     {:error, {:hubspot_error, status, body}}
   end
 
@@ -342,7 +346,12 @@ defmodule SocialScribe.Hubspot.Api do
     end
   end
 
-  defp handle_update_response(%Tesla.Env{status: status, body: body}, _credential, _contact_id, _properties) do
+  defp handle_update_response(
+         %Tesla.Env{status: status, body: body},
+         _credential,
+         _contact_id,
+         _properties
+       ) do
     {:error, {:hubspot_error, status, body}}
   end
 

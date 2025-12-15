@@ -132,14 +132,18 @@ defmodule SocialScribe.Bots do
                :minute
              )
            ) do
-      status = case api_response do
-        %{status_changes: status_changes} when is_list(status_changes) and length(status_changes) > 0 ->
-          case List.first(status_changes) do
-            %{code: code} when is_binary(code) -> code
-            _ -> "pending"
-          end
-        _ -> "pending"
-      end
+      status =
+        case api_response do
+          %{status_changes: status_changes}
+          when is_list(status_changes) and length(status_changes) > 0 ->
+            case List.first(status_changes) do
+              %{code: code} when is_binary(code) -> code
+              _ -> "pending"
+            end
+
+          _ ->
+            "pending"
+        end
 
       create_recall_bot(%{
         user_id: user.id,
@@ -189,14 +193,18 @@ defmodule SocialScribe.Bots do
              calendar_event.hangout_link,
              DateTime.add(calendar_event.start_time, -join_minute_offset, :minute)
            ) do
-      status = case api_response do
-        %{status_changes: status_changes} when is_list(status_changes) and length(status_changes) > 0 ->
-          case List.first(status_changes) do
-            %{code: code} when is_binary(code) -> code
-            _ -> "pending"
-          end
-        _ -> "pending"
-      end
+      status =
+        case api_response do
+          %{status_changes: status_changes}
+          when is_list(status_changes) and length(status_changes) > 0 ->
+            case List.first(status_changes) do
+              %{code: code} when is_binary(code) -> code
+              _ -> "pending"
+            end
+
+          _ ->
+            "pending"
+        end
 
       update_recall_bot(bot, %{
         status: status

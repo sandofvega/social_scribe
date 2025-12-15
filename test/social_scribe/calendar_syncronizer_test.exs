@@ -66,7 +66,9 @@ defmodule SocialScribe.CalendarSyncronizerTest do
       assert {:ok, :sync_complete} = CalendarSyncronizer.sync_events_for_user(user)
 
       # Count only events for this user
-      event_count = Repo.aggregate(from(ce in CalendarEvent, where: ce.user_id == ^user.id), :count, :id)
+      event_count =
+        Repo.aggregate(from(ce in CalendarEvent, where: ce.user_id == ^user.id), :count, :id)
+
       assert event_count == 2
 
       zoom_event = Repo.get_by!(CalendarEvent, google_event_id: "zoom-event-123")
@@ -104,7 +106,9 @@ defmodule SocialScribe.CalendarSyncronizerTest do
       assert {:ok, :sync_complete} = CalendarSyncronizer.sync_events_for_user(user)
 
       # Count only events for this user
-      event_count = Repo.aggregate(from(ce in CalendarEvent, where: ce.user_id == ^user.id), :count, :id)
+      event_count =
+        Repo.aggregate(from(ce in CalendarEvent, where: ce.user_id == ^user.id), :count, :id)
+
       assert event_count == 1
       assert Repo.get_by!(CalendarEvent, google_event_id: "zoom-event-123")
     end

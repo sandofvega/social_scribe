@@ -636,7 +636,9 @@ defmodule SocialScribeWeb.MeetingLive.Show do
   defp normalize_hubspot_value(value), do: value
 
   defp values_are_different?(selected_contact, field, contact_info_map) do
-    existing_raw = if selected_contact, do: get_hubspot_field_value(selected_contact, field), else: nil
+    existing_raw =
+      if selected_contact, do: get_hubspot_field_value(selected_contact, field), else: nil
+
     extracted_raw = get_extracted_field_value(contact_info_map, field)
 
     existing_normalized = normalize_hubspot_value(existing_raw)
