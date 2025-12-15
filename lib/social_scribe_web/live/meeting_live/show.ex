@@ -693,7 +693,7 @@ defmodule SocialScribeWeb.MeetingLive.Show do
           <div :for={segment <- @meeting_transcript.content["data"]} class="mb-3">
             <p>
               <span class="font-semibold text-indigo-600">
-                {segment["speaker"] || "Unknown Speaker"}:
+                {get_in(segment, ["participant", "name"]) || segment["speaker"] || "Unknown Speaker"}:
               </span>
               {Enum.map_join(segment["words"] || [], " ", & &1["text"])}
             </p>
