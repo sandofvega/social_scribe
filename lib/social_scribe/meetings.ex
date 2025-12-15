@@ -371,7 +371,12 @@ defmodule SocialScribe.Meetings do
   Creates a complete meeting record from Recall.ai bot info and transcript data.
   This should be called when a bot's status is "done".
   """
-  def create_meeting_from_recall_data(%RecallBot{} = recall_bot, bot_api_info, transcript_data) do
+  def create_meeting_from_recall_data(
+        %RecallBot{} = recall_bot,
+        bot_api_info,
+        transcript_data,
+        participants_data
+      ) do
     calendar_event = Repo.preload(recall_bot, :calendar_event).calendar_event
 
     Repo.transaction(fn ->
@@ -383,7 +388,7 @@ defmodule SocialScribe.Meetings do
 
       {:ok, _transcript} = create_meeting_transcript(transcript_attrs)
 
-      Enum.each(bot_api_info.meeting_participants || [], fn participant_data ->
+      Enum.each(participants_data || [], fn participant_data ->
         participant_attrs = parse_participant_attrs(meeting, participant_data)
         create_meeting_participant(participant_attrs)
       end)
@@ -430,19 +435,51 @@ defmodule SocialScribe.Meetings do
   end
 
   defp parse_transcript_attrs(meeting, transcript_data) do
+    # Handle case where transcript_data might be a JSON string
+    decoded_data = decode_transcript_data(transcript_data)
+
+    # Ensure decoded_data is a list before calling List.first
+    transcript_list = if is_list(decoded_data), do: decoded_data, else: []
+    first_segment = List.first(transcript_list)
+
+    language =
+      first_segment
+      |> case do
+        nil -> "unknown"
+        segment -> Map.get(segment, "language") || Map.get(segment, :language) || "unknown"
+      end
+
     %{
       meeting_id: meeting.id,
-      content: %{data: transcript_data},
-      language: List.first(transcript_data || []) |> Map.get(:language, "unknown")
+      content: %{data: decoded_data},
+      language: language
     }
   end
 
+  defp decode_transcript_data(data) when is_binary(data) do
+    case Jason.decode(data) do
+      {:ok, decoded} -> decoded
+      {:error, _} -> []
+    end
+  end
+
+  defp decode_transcript_data(data) when is_list(data), do: data
+  defp decode_transcript_data(_), do: []
+
   defp parse_participant_attrs(meeting, participant_data) do
+    recall_participant_id =
+      participant_data
+      |> fetch_participant_value(:id)
+      |> to_string()
+
+    name = fetch_participant_value(participant_data, :name)
+    is_host = fetch_participant_value(participant_data, :is_host, false) || false
+
     %{
       meeting_id: meeting.id,
-      recall_participant_id: to_string(participant_data.id),
-      name: participant_data.name,
-      is_host: Map.get(participant_data, :is_host, false)
+      recall_participant_id: recall_participant_id,
+      name: name,
+      is_host: is_host
     }
   end
 
@@ -518,4 +555,14 @@ defmodule SocialScribe.Meetings do
   end
 
   defp format_transcript_for_prompt(_), do: ""
+
+  defp fetch_participant_value(participant_data, key, default \\ nil) do
+    case Map.fetch(participant_data, key) do
+      {:ok, value} ->
+        value
+
+      :error ->
+        Map.get(participant_data, Atom.to_string(key), default)
+    end
+  end
 end

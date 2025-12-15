@@ -63,6 +63,23 @@ defmodule SocialScribe.Workers.BotStatusPollerTest do
 
   @mock_bot_api_info_done meeting_info_example(%{id: "bot-done-456"})
   @mock_transcript_data meeting_transcript_example()
+  @mock_transcript_payload @mock_transcript_data |> Jason.encode!() |> Jason.decode!()
+  @mock_participants_payload @mock_bot_api_info_done.meeting_participants
+                             |> Jason.encode!()
+                             |> Jason.decode!()
+  @mock_recording List.first(@mock_bot_api_info_done.recordings)
+  @mock_transcript_download_url get_in(@mock_recording, [
+                                  :media_shortcuts,
+                                  :transcript,
+                                  :data,
+                                  :download_url
+                                ])
+  @mock_participants_download_url get_in(@mock_recording, [
+                                    :media_shortcuts,
+                                    :participant_events,
+                                    :data,
+                                    :participants_download_url
+                                  ])
 
   describe "perform/1" do
     setup do
@@ -119,12 +136,20 @@ defmodule SocialScribe.Workers.BotStatusPollerTest do
         {:ok, %Tesla.Env{body: @mock_bot_api_info_done}}
       end)
 
-      # Expect API call to get transcript
-      expect(RecallApiMock, :get_bot_transcript, fn "bot-done-456" ->
-        {:ok, %Tesla.Env{body: @mock_transcript_data}}
+      expect(RecallApiMock, :download_json_from_url, 2, fn url ->
+        cond do
+          url == @mock_transcript_download_url ->
+            {:ok, @mock_transcript_payload}
+
+          url == @mock_participants_download_url ->
+            {:ok, @mock_participants_payload}
+
+          true ->
+            flunk("Unexpected download url #{inspect(url)}")
+        end
       end)
 
-      expect(AIGeneratorMock, :generate_follow_up_email, fn @mock_transcript_data ->
+      expect(AIGeneratorMock, :generate_follow_up_email, fn _meeting ->
         {:ok, "Follow-up email draft"}
       end)
 
@@ -139,8 +164,7 @@ defmodule SocialScribe.Workers.BotStatusPollerTest do
 
       transcript_record = Repo.get_by!(Meetings.MeetingTranscript, meeting_id: meeting.id)
 
-      assert transcript_record.content["data"] ==
-               @mock_transcript_data |> Jason.encode!() |> Jason.decode!()
+      assert transcript_record.content["data"] == @mock_transcript_payload
 
       meeting_id = meeting.id
 
@@ -175,7 +199,8 @@ defmodule SocialScribe.Workers.BotStatusPollerTest do
       Meetings.create_meeting_from_recall_data(
         bot_record,
         @mock_bot_api_info_done,
-        @mock_transcript_data
+        @mock_transcript_payload,
+        @mock_participants_payload
       )
 
       # Expect API call to get bot status
@@ -185,7 +210,7 @@ defmodule SocialScribe.Workers.BotStatusPollerTest do
          %Tesla.Env{body: Map.put(@mock_bot_api_info_done, "id", "bot-already-processed-789")}}
       end)
 
-      # CRUCIALLY: Do NOT expect get_bot_transcript to be called again
+      # CRUCIALLY: Do NOT expect download_json_from_url to be called again
       # Mox will verify this implicitly. If it were called, the test would fail
       # because there's no matching `expect` for it in this test case.
 
@@ -227,7 +252,7 @@ defmodule SocialScribe.Workers.BotStatusPollerTest do
       assert updated_bot.status == "polling_error"
     end
 
-    test "handles API error when fetching transcript after bot is 'done'" do
+    test "handles API error when downloading transcript data after bot is 'done'" do
       user = user_fixture()
       calendar_event = calendar_event_fixture(%{user_id: user.id})
 
@@ -245,8 +270,9 @@ defmodule SocialScribe.Workers.BotStatusPollerTest do
          %Tesla.Env{body: Map.put(@mock_bot_api_info_done, "id", "bot-transcript-error-111")}}
       end)
 
-      # Expect API call to get transcript to FAIL
-      expect(RecallApiMock, :get_bot_transcript, fn "bot-transcript-error-111" ->
+      # Expect transcript download to FAIL
+      expect(RecallApiMock, :download_json_from_url, fn url ->
+        assert url == @mock_transcript_download_url
         {:error, :transcript_fetch_failed}
       end)
 

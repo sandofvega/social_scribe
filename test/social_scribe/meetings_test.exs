@@ -269,7 +269,7 @@ defmodule SocialScribe.MeetingsTest do
     end
   end
 
-  describe "create_meeting_from_recall_data/3" do
+  describe "create_meeting_from_recall_data/4" do
     import SocialScribe.MeetingInfoExample
     import SocialScribe.MeetingTranscriptExample
 
@@ -286,8 +286,18 @@ defmodule SocialScribe.MeetingsTest do
 
       transcript_data = meeting_transcript_example()
 
+      participants_data =
+        bot_api_info.meeting_participants
+        |> Jason.encode!()
+        |> Jason.decode!()
+
       assert {:ok, meeting} =
-               Meetings.create_meeting_from_recall_data(recall_bot, bot_api_info, transcript_data)
+               Meetings.create_meeting_from_recall_data(
+                 recall_bot,
+                 bot_api_info,
+                 transcript_data,
+                 participants_data
+               )
 
       # Verify meeting was created with correct attributes
       assert meeting.title == "Test Meeting"

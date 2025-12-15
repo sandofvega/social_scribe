@@ -52,33 +52,73 @@ defmodule SocialScribe.Workers.BotStatusPoller do
   end
 
   defp process_completed_bot(bot_record, bot_api_info) do
-    Logger.info("Bot #{bot_record.recall_bot_id} is done. Fetching transcript...")
+    Logger.info("Bot #{bot_record.recall_bot_id} is done. Collecting recording artifacts...")
 
-    case RecallApi.get_bot_transcript(bot_record.recall_bot_id) do
-      {:ok, %Tesla.Env{body: transcript_data}} ->
-        Logger.info("Successfully fetched transcript for bot #{bot_record.recall_bot_id}")
+    with {:ok, transcript_url} <- transcript_download_url(bot_api_info),
+         {:ok, participants_url} <- participants_download_url(bot_api_info),
+         {:ok, transcript_data} <- RecallApi.download_json_from_url(transcript_url),
+         {:ok, participants_data} <- RecallApi.download_json_from_url(participants_url) do
+      Logger.info(
+        "Successfully fetched transcript and participants for bot #{bot_record.recall_bot_id}"
+      )
 
-        case Meetings.create_meeting_from_recall_data(bot_record, bot_api_info, transcript_data) do
-          {:ok, meeting} ->
-            Logger.info(
-              "Successfully created meeting record #{meeting.id} from bot #{bot_record.recall_bot_id}"
-            )
+      case Meetings.create_meeting_from_recall_data(
+             bot_record,
+             bot_api_info,
+             transcript_data,
+             participants_data
+           ) do
+        {:ok, meeting} ->
+          Logger.info(
+            "Successfully created meeting record #{meeting.id} from bot #{bot_record.recall_bot_id}"
+          )
 
-            SocialScribe.Workers.AIContentGenerationWorker.new(%{meeting_id: meeting.id})
-            |> Oban.insert()
+          SocialScribe.Workers.AIContentGenerationWorker.new(%{meeting_id: meeting.id})
+          |> Oban.insert()
 
-            Logger.info("Enqueued AI content generation for meeting #{meeting.id}")
+          Logger.info("Enqueued AI content generation for meeting #{meeting.id}")
 
-          {:error, reason} ->
-            Logger.error(
-              "Failed to create meeting record from bot #{bot_record.recall_bot_id}: #{inspect(reason)}"
-            )
-        end
-
+        {:error, reason} ->
+          Logger.error(
+            "Failed to create meeting record from bot #{bot_record.recall_bot_id}: #{inspect(reason)}"
+          )
+      end
+    else
       {:error, reason} ->
         Logger.error(
-          "Failed to fetch transcript for bot #{bot_record.recall_bot_id} after completion: #{inspect(reason)}"
+          "Failed to gather recording artifacts for bot #{bot_record.recall_bot_id}: #{inspect(reason)}"
         )
+    end
+  end
+
+  defp transcript_download_url(bot_api_info) do
+    bot_api_info
+    |> Map.get(:recordings, [])
+    |> List.first()
+    |> case do
+      %{media_shortcuts: %{transcript: %{data: %{download_url: url}}}} when is_binary(url) ->
+        {:ok, url}
+
+      _ ->
+        {:error, :transcript_download_url_missing}
+    end
+  end
+
+  defp participants_download_url(bot_api_info) do
+    bot_api_info
+    |> Map.get(:recordings, [])
+    |> List.first()
+    |> case do
+      %{
+        media_shortcuts: %{
+          participant_events: %{data: %{participants_download_url: url}}
+        }
+      }
+      when is_binary(url) ->
+        {:ok, url}
+
+      _ ->
+        {:error, :participants_download_url_missing}
     end
   end
 end

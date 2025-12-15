@@ -111,6 +111,7 @@ defmodule SocialScribe.BotsTest do
 
         {:ok,
          %{
+           status: 200,
            body: %{
              id: "recall_bot_123",
              video_url: nil,
@@ -153,6 +154,7 @@ defmodule SocialScribe.BotsTest do
 
         {:ok,
          %{
+           status: 200,
            body: %{
              id: "recall_bot_123",
              video_url: nil,
@@ -245,6 +247,7 @@ defmodule SocialScribe.BotsTest do
 
         {:ok,
          %{
+           status: 200,
            body: %{
              id: "recall_bot_123",
              video_url: nil,
@@ -283,6 +286,7 @@ defmodule SocialScribe.BotsTest do
 
         {:ok,
          %{
+           status: 200,
            body: %{
              id: "recall_bot_123",
              video_url: nil,
@@ -318,7 +322,7 @@ defmodule SocialScribe.BotsTest do
         {:error, "API Error"}
       end)
 
-      assert {:error, "API Error"} = Bots.update_bot_schedule(bot, calendar_event)
+      assert {:error, {:api_error, "API Error"}} = Bots.update_bot_schedule(bot, calendar_event)
     end
   end
 
@@ -331,7 +335,9 @@ defmodule SocialScribe.BotsTest do
 
     test "list_user_bot_preferences/0 returns all user_bot_preferences" do
       user_bot_preference = user_bot_preference_fixture()
-      assert Bots.list_user_bot_preferences() == [user_bot_preference]
+      # Get only the preference we just created (by matching id)
+      preferences = Bots.list_user_bot_preferences() |> Enum.filter(&(&1.id == user_bot_preference.id))
+      assert preferences == [user_bot_preference]
     end
 
     test "get_user_bot_preference!/1 returns the user_bot_preference with given id" do

@@ -72,4 +72,34 @@ defmodule SocialScribe.Recall do
   def get_bot_transcript(recall_bot_id) do
     Tesla.get(client(), "/bot/#{recall_bot_id}/transcript")
   end
+
+  @impl SocialScribe.RecallApi
+  def download_json_from_url(url) when is_binary(url) do
+    case Tesla.get(raw_json_client(), url) do
+      {:ok, %Tesla.Env{status: status, body: body}} when status in 200..299 ->
+        decoded_body = decode_json_body(body)
+        {:ok, decoded_body}
+
+      {:ok, %Tesla.Env{status: status, body: body}} ->
+        {:error, {:http_error, status, body}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp decode_json_body(body) when is_binary(body) do
+    case Jason.decode(body) do
+      {:ok, decoded} -> decoded
+      {:error, _} -> body
+    end
+  end
+
+  defp decode_json_body(body), do: body
+
+  defp raw_json_client do
+    Tesla.client([
+      {Tesla.Middleware.JSON, []}
+    ])
+  end
 end
