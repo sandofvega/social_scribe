@@ -95,6 +95,8 @@ defmodule SocialScribe.AIContentGenerator do
     - Only extract information that is EXPLICITLY mentioned in the transcript
     - Do NOT generate placeholder, example, or dummy data (e.g., "example.com", "John Doe", "555-123-4567")
     - Do NOT make up or infer contact information
+    - Capitalize the first character of each word in text fields (e.g., names, job titles, company names, cities)
+    - Remove all spaces from email addresses
     - If no contact information is found in the transcript, return an empty JSON object: {}
     - Return ONLY valid JSON, no additional text
 
